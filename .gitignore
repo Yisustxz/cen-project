@@ -16,6 +16,7 @@ build/
 
 # Archivos generados por gRPC
 /generated/
+go.sum
 
 # Archivos temporales de editor (Vim, Emacs, etc.)
 *~
@@ -52,6 +53,8 @@ venv/
 *.pb.go
 *.pb.py
 *.pb.*
+generated/game_pb2.py
+generated/game_pb2_grpc.py
 
 # Excluir archivos de configuraciones locales de IDE
 .vscode/
