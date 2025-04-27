@@ -1,0 +1,69 @@
+# Go: Ignorar archivos generados por Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.a
+*.out
+*.test
+*.log
+
+# Go: Ignorar dependencias y binarios compilados
+/vendor/
+bin/
+build/
+
+# Archivos generados por gRPC
+/generated/
+
+# Archivos temporales de editor (Vim, Emacs, etc.)
+*~
+*.swp
+*.swo
+*.vscode/
+
+# Archivos de configuración de IDE
+.idea/
+.vscode/
+
+# Archivos temporales de Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Archivos temporales de Python que no son necesarios
+*.pdb
+*.db
+*.log
+
+# Ignorar archivos del sistema operativo (Windows, macOS)
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Archivos de entorno virtual de Python
+.venv/
+env/
+venv/
+
+# Ignorar archivos de compiladores
+*.pb.go
+*.pb.py
+*.pb.*
+
+# Excluir archivos de configuraciones locales de IDE
+.vscode/
+.idea/
+
+# Archivos de la carpeta de test
+/testdata/
+
+# Archivos relacionados con Docker (si usas Docker)
+docker-compose.override.yml
+Dockerfile.*
+
+# Archivos de instalación de dependencias de Python
+pip-log.txt
+pip-delete-this-directory.txt

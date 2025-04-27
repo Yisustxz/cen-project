@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option go_package = "github.com/Yisustxz/cen-project/backend/internal/service";
+
+package game;
+
+// Mensaje que envía el jugador
+message PlayerInput {
+  string player_id = 1;
+  string action = 2;
+}
+
+// Mensaje que responde el servidor
+message GameState {
+  string message = 1;
+}
+
+// Servicio gRPC
+service GameService {
+  rpc SendInput (PlayerInput) returns (GameState);
+}
