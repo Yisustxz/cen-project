@@ -35,8 +35,8 @@ class MeteorManager:
         self.min_spawn_frequency = 30  # Mínimo tiempo entre meteoritos
         self.difficulty_increase_rate = 0.002  # Aumento de dificultad por frame
         
-        # Pesos de probabilidad para diferentes tipos de meteoritos
-        self.meteor_weights = {
+        # Pesos de probabilidad para diferentes categorías de meteoritos
+        self.meteor_category_weights = {
             "big": 20,     # Meteoritos grandes: 20%
             "medium": 35,  # Meteoritos medianos: 35%
             "small": 30,   # Meteoritos pequeños: 30%
@@ -175,20 +175,16 @@ class MeteorManager:
         Selecciona un tipo de meteorito aleatorio basado en los pesos de probabilidad.
         
         Returns:
-            str: Tipo de meteorito (por ejemplo, "brown_big", "grey_small")
+            str: Tipo de meteorito individual (por ejemplo, "brown_big_1", "grey_small_2")
         """
-        # Primero seleccionar tamaño
-        sizes = list(self.meteor_weights.keys())
-        size_weights = [self.meteor_weights[size] for size in sizes]
-        size = random.choices(sizes, weights=size_weights, k=1)[0]
+        # Primero seleccionar categoría de tamaño
+        categories = list(self.meteor_category_weights.keys())
+        size_weights = [self.meteor_category_weights[cat] for cat in categories]
+        selected_category = random.choices(categories, weights=size_weights, k=1)[0]
         
-        # Luego seleccionar color
-        colors = list(self.color_weights.keys())
-        color_weights = [self.color_weights[color] for color in colors]
-        color = random.choices(colors, weights=color_weights, k=1)[0]
-        
-        # Combinar en un tipo completo
-        return f"{color}_{size}"
+        # Usar el sistema de categorías de MeteorData para obtener un tipo aleatorio
+        # dentro de la categoría seleccionada
+        return MeteorData.get_random_type(selected_category)
     
     # La función increase_difficulty está comentada para ser activada solo
     # cuando se reciba una señal del servidor
@@ -203,9 +199,9 @@ class MeteorManager:
     #     self.difficulty_factor += amount
     #     
     #     # Ajustar pesos hacia meteoritos más pequeños y rápidos
-    #     if self.meteor_weights["big"] > 5:
-    #         self.meteor_weights["big"] -= amount * 10
-    #         self.meteor_weights["tiny"] += amount * 10
+    #     if self.meteor_category_weights["big"] > 5:
+    #         self.meteor_category_weights["big"] -= amount * 10
+    #         self.meteor_category_weights["tiny"] += amount * 10
     #     
     #     # Ajustar pesos hacia más meteoritos grises (más resistentes)
     #     if self.color_weights["grey"] < 60:

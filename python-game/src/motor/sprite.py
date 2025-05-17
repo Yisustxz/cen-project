@@ -13,6 +13,15 @@ from space_shooter.utils.delta_time import DeltaTime
 class GameObject(pygame.sprite.Sprite):
     """Clase base para todos los objetos del juego con hitbox personalizada."""
     
+    # Fuente para el modo debug
+    debug_font = None
+    
+    # Constantes para el modo debug
+    DEBUG_HITBOX_COLOR = (255, 0, 0)       # Rojo para contorno del hitbox
+    DEBUG_CENTER_COLOR = (255, 255, 0)     # Amarillo para centro del hitbox
+    DEBUG_SPRITE_CENTER_COLOR = (0, 0, 0)  # Negro para centro del sprite
+    DEBUG_CENTER_SIZE = 4                  # Tamaño de los puntos centrales
+    
     def __init__(self, x, y, image=None, obj_type=None):
         """
         Inicializa un objeto del juego.
@@ -46,9 +55,11 @@ class GameObject(pygame.sprite.Sprite):
         self.rotation_speed = 0
         
         # Control de hitbox
-        self.has_hitbox = True  # Indica si el objeto tiene hitbox
-        self.hitbox_scale = 1.0  # Factor de escala para la hitbox (1.0 = tamaño completo)
-        self.hitbox_padding = 0  # Padding negativo (reducción) o positivo (expansión) en pixels
+        self.has_hitbox = False  # Por defecto NO hay hitbox hasta que se establezca hitbox_data
+        self.hitbox = pygame.Rect(0, 0, 0, 0)  # Hitbox vacío inicialmente
+        
+        # Datos de hitbox (REQUERIDO para tener hitbox)
+        self.hitbox_data = None
         
         # Cargar imagen si se proporciona
         if image:
@@ -60,13 +71,13 @@ class GameObject(pygame.sprite.Sprite):
             self.image.fill((255, 255, 255))
             self.original_image = self.image
         
-        # Crear rect
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        
-        # Crear hitbox predeterminada con el mismo tamaño que el rect
-        self.create_hitbox()
+        # Inicializar fuente para debug si es necesario
+        if GameObject.debug_font is None:
+            try:
+                # Aumentar el tamaño de la fuente a 14 para mejor legibilidad
+                GameObject.debug_font = pygame.font.SysFont("Arial", 14)
+            except:
+                GameObject.debug_font = pygame.font.Font(None, 14)
     
     def set_game(self, game):
         """
@@ -126,55 +137,72 @@ class GameObject(pygame.sprite.Sprite):
         """
         return (self.speed_x, self.speed_y)
     
-    def create_hitbox(self, scale=None, padding=None):
+    def set_hitbox_data(self, data):
         """
-        Crea o actualiza la hitbox basada en la imagen actual.
+        MÉTODO PRINCIPAL para establecer datos de hitbox.
+        Este método DEBE ser llamado para tener un hitbox válido.
         
         Args:
-            scale: Factor de escala (1.0 = tamaño completo)
-            padding: Padding negativo (reducción) o positivo (expansión) en pixels
+            data: Diccionario con datos de configuración de la hitbox
+                Debe contener:
+                - width/height: Dimensiones exactas de la hitbox
+                Opcional:
+                - offset_x/offset_y: Desplazamiento desde el centro
         """
-        if scale is not None:
-            self.hitbox_scale = scale
-        if padding is not None:
-            self.hitbox_padding = padding
-            
-        if not self.has_hitbox:
-            self.hitbox = pygame.Rect(0, 0, 0, 0)
+        if not data:
+            self.disable_hitbox()
             return
             
-        # Calcular dimensiones de la hitbox
-        if self.hitbox_scale != 1.0:
-            # Escalar basado en porcentaje
-            width = int(self.rect.width * self.hitbox_scale)
-            height = int(self.rect.height * self.hitbox_scale)
-        else:
-            # Usar padding en pixels
-            width = self.rect.width + (self.hitbox_padding * 2)
-            height = self.rect.height + (self.hitbox_padding * 2)
-            
-        # Asegurar dimensiones mínimas
-        width = max(width, 1)
-        height = max(height, 1)
+        # Guardar los datos
+        self.hitbox_data = {
+            "width": data.get("width", data.get("hitbox_width", 10)),
+            "height": data.get("height", data.get("hitbox_height", 10)),
+            "offset_x": data.get("offset_x", 0),
+            "offset_y": data.get("offset_y", 0)
+        }
         
-        # Crear la hitbox
+        # Activar hitbox y aplicar configuración
+        self.has_hitbox = True
+        self.update_hitbox()
+    
+    def update_hitbox(self):
+        """
+        Actualiza el hitbox según la configuración.
+        Esta función se llama automáticamente cuando cambia la posición.
+        """
+        if not self.has_hitbox or not self.hitbox_data:
+            return
+
+        # Obtener dimensiones y offsets del hitbox_data
+        width = self.hitbox_data.get("width", 10)
+        height = self.hitbox_data.get("height", 10)
+        offset_x = self.hitbox_data.get("offset_x", 0)
+        offset_y = self.hitbox_data.get("offset_y", 0)
+
+        # Crear hitbox con posición basada en offset desde la posición del objeto
         self.hitbox = pygame.Rect(0, 0, width, height)
-        self.update_hitbox_position()
+        
+        # Centrar hitbox respecto a la posición del objeto
+        self.hitbox.centerx = self.x + (self.hitbox_data.get("width", 10) // 2) + offset_x
+        self.hitbox.centery = self.y + (self.hitbox_data.get("height", 10) // 2) + offset_y
+    
+    def create_custom_hitbox(self, data):
+        """
+        Método de compatibilidad - redirige a set_hitbox_data.
+        """
+        self.set_hitbox_data(data)
     
     def disable_hitbox(self):
         """Desactiva la hitbox del objeto."""
         self.has_hitbox = False
         self.hitbox = pygame.Rect(0, 0, 0, 0)
+        self.hitbox_data = None
     
     def enable_hitbox(self):
-        """Activa la hitbox del objeto."""
-        self.has_hitbox = True
-        self.create_hitbox()
-    
-    def update_hitbox_position(self):
-        """Actualiza la posición de la hitbox para que coincida con el rect."""
-        if self.has_hitbox:
-            self.hitbox.center = self.rect.center
+        """Activa la hitbox del objeto si hay datos de hitbox."""
+        if self.hitbox_data:
+            self.has_hitbox = True
+            self.update_hitbox()
     
     def update(self):
         """
@@ -189,10 +217,6 @@ class GameObject(pygame.sprite.Sprite):
         if self.speed_y != 0:
             self.y += self.speed_y * delta
         
-        # Actualizar posición básica
-        self.rect.x = int(self.x)  # Convertir a entero para evitar problemas de precisión
-        self.rect.y = int(self.y)
-        
         # Actualizar rotación si hay velocidad de rotación
         if self.rotation_speed != 0:
             # Aplicar rotación usando delta time
@@ -200,8 +224,8 @@ class GameObject(pygame.sprite.Sprite):
             self.angle %= 360
             self.update_rotation()
         
-        # Actualizar posición de hitbox
-        self.update_hitbox_position()
+        # Actualizar posición de hitbox (EL HITBOX NUNCA ROTA)
+        self.update_hitbox()
         
         # Llamar al método específico de la clase derivada
         # Esto permite que cada objeto implemente su lógica específica
@@ -215,22 +239,14 @@ class GameObject(pygame.sprite.Sprite):
         pass  # Por defecto no hace nada
     
     def update_rotation(self):
-        """Actualiza la rotación de la imagen y ajusta el rect y hitbox."""
+        """
+        Actualiza la rotación de la imagen, pero NO DEL HITBOX.
+        El hitbox se mantiene con su forma y dimensiones originales.
+        """
         if self.original_image is not None:
             # Rotar la imagen
             self.image = pygame.transform.rotate(self.original_image, self.angle)
-            
-            # Actualizar el rect manteniendo el centro
-            old_center = self.rect.center
-            self.rect = self.image.get_rect()
-            self.rect.center = old_center
-            
-            # Si la hitbox está habilitada, actualizarla para la rotación
-            if self.has_hitbox:
-                # Recalcular la hitbox para la imagen rotada
-                self.create_hitbox()
-                self.hitbox.center = self.rect.center
-    
+
     def set_visibility(self, visible):
         """
         Establece si el objeto es visible o no.
@@ -266,7 +282,7 @@ class GameObject(pygame.sprite.Sprite):
             surface: Superficie de pygame donde dibujar
         """
         if self.is_visible:
-            surface.blit(self.image, self.rect)
+            surface.blit(self.image, (self.x, self.y))
     
     def draw_hitbox(self, surface, color=None):
         """
@@ -276,7 +292,10 @@ class GameObject(pygame.sprite.Sprite):
             surface: Superficie de pygame donde dibujar
             color: Color RGBA para dibujar la hitbox (opcional, se usará un color por defecto según tipo)
         """
-        if self.has_hitbox and self.is_visible:
+        if self.has_hitbox and self.hitbox and self.is_visible:
+            # Primero dibujar los puntos centrales y texto usando draw_debug
+            self.draw_debug(surface)
+            
             # Definir colores por tipo de objeto si no se especifica un color
             if color is None:
                 if self.type == "player":
@@ -294,6 +313,41 @@ class GameObject(pygame.sprite.Sprite):
             
             # Dibujar en la superficie del juego
             surface.blit(hitbox_surface, self.hitbox)
+    
+    def draw_debug(self, surface):
+        """
+        Dibuja información de depuración sobre el objeto.
+        
+        Args:
+            surface: Superficie de Pygame donde dibujar
+        """
+        if self.has_hitbox and self.hitbox and self.is_visible:
+            # Dibujar hitbox como rectángulo
+            pygame.draw.rect(surface, self.DEBUG_HITBOX_COLOR, self.hitbox, 1)
+            
+            # Dibujar centro del hitbox como punto amarillo
+            center_x = self.hitbox.centerx
+            center_y = self.hitbox.centery
+            pygame.draw.circle(surface, self.DEBUG_CENTER_COLOR, 
+                               (center_x, center_y), self.DEBUG_CENTER_SIZE // 2)
+            
+            # Dibujar centro del sprite como punto negro
+            sprite_center_x = int(self.x)
+            sprite_center_y = int(self.y)
+            pygame.draw.circle(surface, self.DEBUG_SPRITE_CENTER_COLOR, 
+                               (sprite_center_x, sprite_center_y), self.DEBUG_CENTER_SIZE // 2)
+            
+            # Mostrar información específica para meteoritos
+            if self.type == "meteor" and hasattr(self, 'meteor_type'):
+                if GameObject.debug_font:
+                    # Dibujar tipo de meteorito
+                    type_text = GameObject.debug_font.render(self.meteor_type, True, (255, 255, 255))
+                    surface.blit(type_text, (self.x, self.y - 20))
+                    
+                    # Dibujar HP restante si está disponible
+                    if hasattr(self, 'hp'):
+                        hp_text = GameObject.debug_font.render(f"HP: {self.hp}", True, (255, 255, 255))
+                        surface.blit(hp_text, (self.x, self.y - 10))
     
     def emit_event(self, event_type, data=None):
         """

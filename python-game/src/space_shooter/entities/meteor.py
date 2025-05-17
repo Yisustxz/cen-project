@@ -14,7 +14,7 @@ class Meteor(GameObject):
         
         Args:
             image: Imagen del meteorito
-            meteor_type: Tipo de meteorito (brown_big, grey_small, etc.)
+            meteor_type: Tipo de meteorito (brown_big_1, grey_small_2, etc.)
             data: Diccionario con los datos de configuración
             position: Tupla (x, y) con la posición inicial del meteorito
             speed: Tupla (speed_x, speed_y) con la velocidad en ambos ejes
@@ -22,6 +22,9 @@ class Meteor(GameObject):
         """
         # Posición proporcionada por el meteor_manager
         x, y = position
+        
+        # Guardar los datos para usar después en la hitbox personalizada
+        self.hitbox_data = data
         
         # Llamar al constructor de la clase padre con la imagen y tipo
         super().__init__(x, y, image, obj_type="meteor")
@@ -40,9 +43,8 @@ class Meteor(GameObject):
         angle, rotation_speed = rotation
         self.set_rotation(angle, rotation_speed)
         
-        # Crear hitbox ajustada
-        padding = data.get("hitbox_padding", -5)
-        self.create_hitbox(padding=padding)
+        # Aplicar hitbox usando el método de la clase base
+        self.set_hitbox_data(data)
         
         # Contador para controlar el parpadeo al recibir daño
         self.blink_counter = 0
@@ -55,8 +57,6 @@ class Meteor(GameObject):
         Lógica específica de actualización del meteorito.
         Este método es llamado automáticamente por la clase base GameObject.
         """
-        # Ya no es necesario mover el meteorito aquí, lo hace la clase base con el delta time
-        
         # Controlar el parpadeo
         if self.blink_counter > 0:
             self.blink_counter -= 1
@@ -107,7 +107,9 @@ class Meteor(GameObject):
     def on_collide(self, other_entity):
         """Maneja la colisión con otra entidad."""
         if other_entity.type == "missile":
-            return self.take_damage()
+            # Obtener el daño desde el misil
+            missile_damage = other_entity.get_damage() if hasattr(other_entity, 'get_damage') else 1
+            return self.take_damage(missile_damage)
         return False
     
     def get_points(self):

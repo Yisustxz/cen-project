@@ -3,7 +3,8 @@ Clase Missile - Representa los proyectiles disparados por el jugador.
 """
 import pygame
 from motor.sprite import GameObject
-from space_shooter.core.constants import MISSILE_SPEED, WHITE
+from space_shooter.data.player_data import PlayerData
+from space_shooter.core.constants import WHITE
 
 class Missile(GameObject):
     """Clase que representa los misiles disparados por el jugador."""
@@ -12,8 +13,28 @@ class Missile(GameObject):
         # Inicializar primero sin imagen, pero con tipo "missile"
         super().__init__(x, y, None, obj_type="missile")
         
+        # Cargar datos de configuración
+        missile_config = PlayerData.get_missile_data()
+        
+        # Ajustar el hitbox para hacerlo más pequeño
+        self.hitbox_data = PlayerData.get_missile_hitbox_data()
+        # Reducir el ancho del hitbox
+        self.hitbox_data["width"] = int(self.hitbox_data["width"] * 0.7)
+        # Reducir el alto del hitbox
+        self.hitbox_data["height"] = int(self.hitbox_data["height"] * 0.7)
+        
+        # Obtener velocidad desde la configuración
+        missile_speed = PlayerData.get_missile_speed()
+        
+        # Guardar el daño que causa este misil
+        self.damage = PlayerData.get_missile_damage()
+        
         # Crear una simple imagen blanca para el misil
-        self.image = pygame.Surface((2, 6))
+        # Usamos las dimensiones del hitbox para la imagen
+        width = self.hitbox_data["width"] // 2  # Hacer la imagen más pequeña que el hitbox
+        height = self.hitbox_data["height"] // 2
+        
+        self.image = pygame.Surface((width, height))
         self.original_image = self.image
 
         # Dibujar el misil como píxeles blancos
@@ -21,21 +42,15 @@ class Missile(GameObject):
             for h in range(self.image.get_height()):
                 self.image.set_at((w, h), WHITE)
 
-        # Configurar rect
-        self.rect = self.image.get_rect()
-        self.rect.x = x - self.rect.width // 2
-        self.rect.y = y
-
-        # Establecer velocidad usando MISSILE_SPEED que ya está en píxeles por segundo
-        self.set_velocity(0, -MISSILE_SPEED)
-
-        # Crear una hitbox más grande para facilitar impactos
-        # Usar las nuevas funcionalidades de escala
-        self.create_hitbox(scale=5.0)  # Hitbox 5 veces más grande que el misil para mayor visibilidad
+        # Ajustar posición para centrar el misil en X
+        self.x = x - (width // 2)
         
-        # Asegurar que la hitbox está centrada con el misil
-        self.hitbox.centerx = self.rect.centerx
-        self.hitbox.centery = self.rect.centery
+        # Establecer velocidad usando los datos de configuración
+        self.set_velocity(0, -missile_speed)
+
+
+        # Aplicar hitbox con los datos de configuración ajustados
+        self.set_hitbox_data(self.hitbox_data)
         
         # Para controlar si debe ser eliminado
         self.should_destroy = False
@@ -49,7 +64,7 @@ class Missile(GameObject):
         # Ya no es necesario mover el misil, lo hace la clase base con delta time
         
         # Verificar si el misil sigue en pantalla
-        if self.rect.bottom <= 0:
+        if self.hitbox.bottom <= 0:
             self.should_destroy = True
             
         # Si debe ser destruido, notificar al juego y eliminarse
@@ -68,6 +83,15 @@ class Missile(GameObject):
             self.should_destroy = True
             return True
         return False
+    
+    def get_damage(self):
+        """
+        Obtiene el daño que causa este misil.
+        
+        Returns:
+            int: Cantidad de daño que inflige el misil
+        """
+        return self.damage
     
     def should_be_destroyed(self):
         """

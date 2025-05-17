@@ -1,0 +1,406 @@
+{
+  "meteors": {
+    "types": {
+      "brown_big_1": {
+        "image": "brown_big_1.png",
+        "speed_x_range": [
+          -60,
+          60
+        ],
+        "speed_y_range": [
+          60,
+          180
+        ],
+        "hp": 3,
+        "points": 100,
+        "rotation_speed_range": [
+          -120,
+          120
+        ],
+        "hitbox_width": 48,
+        "hitbox_height": 48,
+        "offset_x": 6,
+        "offset_y": 3
+      },
+      "brown_big_2": {
+        "image": "brown_big_2.png",
+        "speed_x_range": [
+          -60,
+          60
+        ],
+        "speed_y_range": [
+          60,
+          180
+        ],
+        "hp": 3,
+        "points": 100,
+        "rotation_speed_range": [
+          -120,
+          120
+        ],
+        "hitbox_width": 46,
+        "hitbox_height": 46,
+        "offset_x": 7,
+        "offset_y": 5
+      },
+      "brown_medium_1": {
+        "image": "brown_medium_1.png",
+        "speed_x_range": [
+          -90,
+          90
+        ],
+        "speed_y_range": [
+          120,
+          240
+        ],
+        "hp": 2,
+        "points": 75,
+        "rotation_speed_range": [
+          -120,
+          120
+        ],
+        "hitbox_width": 32,
+        "hitbox_height": 32,
+        "offset_x": 0,
+        "offset_y": 11
+      },
+      "brown_medium_2": {
+        "image": "brown_medium_2.png",
+        "speed_x_range": [
+          -90,
+          90
+        ],
+        "speed_y_range": [
+          120,
+          240
+        ],
+        "hp": 2,
+        "points": 75,
+        "rotation_speed_range": [
+          -120,
+          120
+        ],
+        "hitbox_width": 30,
+        "hitbox_height": 30,
+        "offset_x": 1,
+        "offset_y": 1
+      },
+      "brown_small_1": {
+        "image": "brown_small_1.png",
+        "speed_x_range": [
+          -120,
+          120
+        ],
+        "speed_y_range": [
+          120,
+          300
+        ],
+        "hp": 1,
+        "points": 50,
+        "rotation_speed_range": [
+          -150,
+          150
+        ],
+        "hitbox_width": 20,
+        "hitbox_height": 20,
+        "offset_x": -1,
+        "offset_y": 6
+      },
+      "brown_small_2": {
+        "image": "brown_small_2.png",
+        "speed_x_range": [
+          -120,
+          120
+        ],
+        "speed_y_range": [
+          120,
+          300
+        ],
+        "hp": 1,
+        "points": 50,
+        "rotation_speed_range": [
+          -150,
+          150
+        ],
+        "hitbox_width": 18,
+        "hitbox_height": 18,
+        "offset_x": 0,
+        "offset_y": 3
+      },
+      "brown_tiny_1": {
+        "image": "brown_tiny_1.png",
+        "speed_x_range": [
+          -150,
+          150
+        ],
+        "speed_y_range": [
+          180,
+          360
+        ],
+        "hp": 1,
+        "points": 25,
+        "rotation_speed_range": [
+          -180,
+          180
+        ],
+        "hitbox_width": 14,
+        "hitbox_height": 14,
+        "offset_x": 2,
+        "offset_y": 0
+      },
+      "brown_tiny_2": {
+        "image": "brown_tiny_2.png",
+        "speed_x_range": [
+          -150,
+          150
+        ],
+        "speed_y_range": [
+          180,
+          360
+        ],
+        "hp": 1,
+        "points": 25,
+        "rotation_speed_range": [
+          -180,
+          180
+        ],
+        "hitbox_width": 10,
+        "hitbox_height": 10,
+        "offset_x": 2,
+        "offset_y": 6
+      },
+      "grey_big_1": {
+        "image": "grey_big_1.png",
+        "speed_x_range": [
+          -48,
+          48
+        ],
+        "speed_y_range": [
+          60,
+          150
+        ],
+        "hp": 4,
+        "points": 120,
+        "rotation_speed_range": [
+          -90,
+          90
+        ],
+        "hitbox_width": 26,
+        "hitbox_height": 26,
+        "offset_x": 1,
+        "offset_y": 6
+      },
+      "grey_big_2": {
+        "image": "grey_big_2.png",
+        "speed_x_range": [
+          -48,
+          48
+        ],
+        "speed_y_range": [
+          60,
+          150
+        ],
+        "hp": 4,
+        "points": 120,
+        "rotation_speed_range": [
+          -90,
+          90
+        ],
+        "hitbox_width": 25,
+        "hitbox_height": 25,
+        "offset_x": 1,
+        "offset_y": 5
+      },
+      "grey_medium_1": {
+        "image": "grey_medium_1.png",
+        "speed_x_range": [
+          -72,
+          72
+        ],
+        "speed_y_range": [
+          90,
+          210
+        ],
+        "hp": 2,
+        "points": 80,
+        "rotation_speed_range": [
+          -120,
+          120
+        ],
+        "hitbox_width": 25,
+        "hitbox_height": 25,
+        "offset_x": 4,
+        "offset_y": 3
+      },
+      "grey_medium_2": {
+        "image": "grey_medium_2.png",
+        "speed_x_range": [
+          -72,
+          72
+        ],
+        "speed_y_range": [
+          90,
+          210
+        ],
+        "hp": 2,
+        "points": 80,
+        "rotation_speed_range": [
+          -120,
+          120
+        ],
+        "hitbox_width": 20,
+        "hitbox_height": 20,
+        "offset_x": 6,
+        "offset_y": 8
+      },
+      "grey_small_1": {
+        "image": "grey_small_1.png",
+        "speed_x_range": [
+          -108,
+          108
+        ],
+        "speed_y_range": [
+          120,
+          270
+        ],
+        "hp": 1,
+        "points": 60,
+        "rotation_speed_range": [
+          -150,
+          150
+        ],
+        "hitbox_width": 25,
+        "hitbox_height": 25,
+        "offset_x": 7,
+        "offset_y": -2
+      },
+      "grey_small_2": {
+        "image": "grey_small_2.png",
+        "speed_x_range": [
+          -108,
+          108
+        ],
+        "speed_y_range": [
+          120,
+          270
+        ],
+        "hp": 1,
+        "points": 60,
+        "rotation_speed_range": [
+          -150,
+          150
+        ],
+        "hitbox_width": 16,
+        "hitbox_height": 16,
+        "offset_x": 0,
+        "offset_y": 0
+      },
+      "grey_tiny_1": {
+        "image": "grey_tiny_1.png",
+        "speed_x_range": [
+          -132,
+          132
+        ],
+        "speed_y_range": [
+          150,
+          330
+        ],
+        "hp": 1,
+        "points": 30,
+        "rotation_speed_range": [
+          -180,
+          180
+        ],
+        "hitbox_width": 16,
+        "hitbox_height": 16,
+        "offset_x": 0,
+        "offset_y": 0
+      },
+      "grey_tiny_2": {
+        "image": "grey_tiny_2.png",
+        "speed_x_range": [
+          -132,
+          132
+        ],
+        "speed_y_range": [
+          150,
+          330
+        ],
+        "hp": 1,
+        "points": 30,
+        "rotation_speed_range": [
+          -180,
+          180
+        ],
+        "hitbox_width": 12,
+        "hitbox_height": 12,
+        "offset_x": 2,
+        "offset_y": 2
+      }
+    },
+    "categories": {
+      "big": [
+        "brown_big_1",
+        "brown_big_2",
+        "grey_big_1",
+        "grey_big_2"
+      ],
+      "medium": [
+        "brown_medium_1",
+        "brown_medium_2",
+        "grey_medium_1",
+        "grey_medium_2"
+      ],
+      "small": [
+        "brown_small_1",
+        "brown_small_2",
+        "grey_small_1",
+        "grey_small_2"
+      ],
+      "tiny": [
+        "brown_tiny_1",
+        "brown_tiny_2",
+        "grey_tiny_1",
+        "grey_tiny_2"
+      ],
+      "brown": [
+        "brown_big_1",
+        "brown_big_2",
+        "brown_medium_1",
+        "brown_medium_2",
+        "brown_small_1",
+        "brown_small_2",
+        "brown_tiny_1",
+        "brown_tiny_2"
+      ],
+      "grey": [
+        "grey_big_1",
+        "grey_big_2",
+        "grey_medium_1",
+        "grey_medium_2",
+        "grey_small_1",
+        "grey_small_2",
+        "grey_tiny_1",
+        "grey_tiny_2"
+      ]
+    }
+  },
+  "player": {
+    "speed": 250,
+    "lives": 3,
+    "fire_delay": 0.5,
+    "damage_time": 2.0,
+    "hitbox_width": 20,
+    "hitbox_height": 40,
+    "offset_x": 10,
+    "offset_y": 0
+  },
+  "missile": {
+    "speed": 500,
+    "damage": 1,
+    "hitbox_width": 8,
+    "hitbox_height": 16,
+    "offset_x": -2,
+    "offset_y": -2
+  }
+}

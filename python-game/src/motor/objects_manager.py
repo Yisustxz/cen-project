@@ -111,13 +111,17 @@ class ObjectsManager:
     
     def draw_hitboxes(self, surface):
         """
-        Dibuja las hitboxes de todos los objetos en modo depuración.
+        Dibuja las hitboxes y puntos centrales de todos los objetos en modo depuración.
         
         Args:
             surface: Superficie de pygame donde dibujar
         """
         for obj in self.objects:
-            if hasattr(obj, 'draw_hitbox') and callable(obj.draw_hitbox):
+            # Primero intentamos usar el nuevo método de depuración mejorado
+            if hasattr(obj, 'draw_debug') and callable(obj.draw_debug):
+                obj.draw_debug(surface)
+            # Si no está disponible, recurrimos al método antiguo
+            elif hasattr(obj, 'draw_hitbox') and callable(obj.draw_hitbox):
                 obj.draw_hitbox(surface)
     
     def detect_collisions(self):
@@ -155,7 +159,7 @@ class ObjectsManager:
             print(f"  - {obj_class}: {count}")
         
         # Imprimir conteo por tipo personalizado
-        if self.objects_by_type:
+        if hasattr(self, 'objects_by_type') and self.objects_by_type:
             print("\nTipos de objetos personalizados:")
             for obj_type, objs in self.objects_by_type.items():
                 print(f"  - {obj_type}: {len(objs)}")

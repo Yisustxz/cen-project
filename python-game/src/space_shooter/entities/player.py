@@ -3,7 +3,7 @@ Clase Player - Representa al jugador controlado por el usuario.
 """
 import pygame
 from motor.sprite import GameObject
-from space_shooter.core.constants import PLAYER_SPEED
+from space_shooter.data.player_data import PlayerData
 from config import Config
 
 class Player(GameObject):
@@ -13,10 +13,22 @@ class Player(GameObject):
         # La imagen la asignaremos después, cuando esté disponible
         super().__init__(x, y, None, "player")
         
-        # Atributos específicos del jugador
-        self.lives = 3
+        # Cargar datos de configuración
+        player_config = PlayerData.get_player_data()
+        
+        # Guardar datos del hitbox personalizado
+        self.hitbox_data = PlayerData.get_player_hitbox_data()
+        
+        # Asegurarse de que se usen los valores de offset
+        self.offset_x = self.hitbox_data.get("offset_x", 0)
+        self.offset_y = self.hitbox_data.get("offset_y", 0)
+        
+        # Atributos específicos del jugador desde la configuración
+        self.lives = PlayerData.get_player_lives()
         self.score = 0
-        self.missile_cooldown = 200  # ms entre disparos
+        
+        # Calcular cooldown en milisegundos desde el delay en segundos
+        self.missile_cooldown = int(PlayerData.get_player_fire_delay() * 1000)
         self.last_missile = 0
         
         # Para el sistema de daño e invencibilidad
@@ -35,11 +47,8 @@ class Player(GameObject):
         self.original_image = image
         self.damage_image = damage_image
         
-        # Actualizar rect y hitbox
-        self.rect = self.image.get_rect()
-        self.rect.x = self.x
-        self.rect.y = self.y
-        self.create_hitbox(padding=-10)  # Hitbox un poco más pequeña que la nave
+        # Aplicar hitbox
+        self.set_hitbox_data(self.hitbox_data)
     
     def on_update(self):
         """
@@ -63,8 +72,8 @@ class Player(GameObject):
         """Dibuja el efecto de daño si el jugador ha sido golpeado."""
         # Dibujar daño si está activo
         if self.invincibility_frames > 0 and self.damage_image:
-            damage_x = self.x - self.image.get_width() / 3
-            damage_y = self.y - self.image.get_height() / 2
+            damage_x = self.x - self.damage_image.get_width() / 3
+            damage_y = self.y - self.damage_image.get_height() / 2
             surface.blit(self.damage_image, (damage_x, damage_y))
     
     def take_damage(self):
@@ -72,7 +81,13 @@ class Player(GameObject):
         if self.invincibility_frames == 0:
             # Recibir daño
             self.lives -= 1
-            self.invincibility_frames = 50
+            
+            # Calcular frames de invencibilidad desde el damage_time en segundos
+            # Asumiendo 60 FPS
+            frames_per_second = 60
+            invincibility_seconds = PlayerData.get_player_damage_time()
+            self.invincibility_frames = int(invincibility_seconds * frames_per_second)
+            
             # Comenzar efecto de parpadeo
             self.set_visibility(False)
             return True
@@ -133,19 +148,19 @@ class Player(GameObject):
         
         action_performed = False
         
-        # Usar directamente PLAYER_SPEED que ya está en píxeles por segundo
-        speed = PLAYER_SPEED
+        # Obtener velocidad desde la configuración
+        speed = PlayerData.get_player_speed()
         
         # Obtener el ancho del nivel para limitar el movimiento
         level_width = Config.get_level_width()
         
         # Mover nave a la izquierda
-        if keys[K_LEFT] and self.rect.left > 0:
+        if keys[K_LEFT] and self.x > 0 - self.offset_x:
             self.set_velocity(-speed, 0)
             action_performed = True
             
         # Mover nave a la derecha
-        elif keys[K_RIGHT] and self.rect.right < level_width:
+        elif keys[K_RIGHT] and self.x + self.hitbox_data["width"] + self.offset_x < level_width:
             self.set_velocity(speed, 0)
             action_performed = True
             
@@ -160,9 +175,10 @@ class Player(GameObject):
             if current_time - self.last_missile > self.missile_cooldown:
                 if self.game:
                     # Emitir evento para crear un misil
+                    missile_x = self.x + (self.hitbox_data["width"] // 2) + self.offset_x
                     self.game.emit_event("player_fire_missile", {
-                        "x": self.rect.centerx,
-                        "y": self.rect.y
+                        "x": missile_x,
+                        "y": self.y
                     })
                     self.last_missile = current_time
                     action_performed = True
