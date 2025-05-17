@@ -1,7 +1,7 @@
 {
   "frontend": {
     "singlePlayerMode": {
-      "enable": true,
+      "enable": false,
       "skipMenu": false
     },
     "display": {
@@ -11,8 +11,8 @@
       "fpsLimit": 60
     },
     "level": {
-        "width": 400,
-        "height": 300
+      "width": 400,
+      "height": 300
     }
   }
-} 
+}
