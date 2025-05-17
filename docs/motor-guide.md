@@ -11,8 +11,10 @@ Este documento describe la arquitectura, el ciclo de vida y los patrones de dise
 5. [Sistema de Eventos](#sistema-de-eventos)
 6. [Sistema de Renderizado](#sistema-de-renderizado)
 7. [Sistema de Colisiones](#sistema-de-colisiones)
-8. [Patrones de Diseño Implementados](#patrones-de-diseño-implementados)
-9. [Buenas Prácticas](#buenas-prácticas)
+8. [Sistema Delta Time](#sistema-delta-time)
+9. [Gestión de Recursos](#gestión-de-recursos)
+10. [Patrones de Diseño Implementados](#patrones-de-diseño-implementados)
+11. [Buenas Prácticas](#buenas-prácticas)
 
 ## Arquitectura General
 
@@ -42,9 +44,44 @@ Esta arquitectura garantiza:
 
 La clase base para crear motores de juego. Maneja el bucle principal, eventos, actualización y renderizado.
 
+**Atributos principales:**
+
+- `objects_manager`: Gestiona todos los objetos registrados
+- `game_surface`: Superficie virtual para el nivel
+- `game_window`: Ventana principal de Pygame
+- `debug_mode`: Controla la visualización de hitboxes y estadísticas
+- `clock`: Reloj para controlar FPS
+
+**Métodos principales:**
+
+- `run()`: Bucle principal del juego
+- `process_events()`: Procesa eventos de Pygame
+- `update()`: Actualiza la lógica del juego
+- `render()`: Renderiza todos los elementos
+- `register_object()/unregister_object()`: Gestiona objetos
+- `emit_event()`: Sistema de eventos para comunicación
+
 ### GameObject
 
 La clase base para todos los objetos del juego. Proporciona funcionalidad común como hitboxes, visibilidad, colisiones, etc.
+
+**Atributos principales:**
+
+- `x, y`: Posición del objeto
+- `speed_x, speed_y`: Velocidad en cada eje
+- `type`: Tipo de objeto para clasificación
+- `hitbox`: Rectángulo de colisión
+- `hitbox_data`: Configuración precisa del hitbox
+- `image`: Imagen visual del objeto
+
+**Métodos principales:**
+
+- `update()`: Actualiza posición y estado
+- `on_update()`: Lógica específica por tipo de objeto
+- `set_hitbox_data()`: Configura el hitbox personalizado
+- `collides_with()`: Detecta colisiones con otros objetos
+- `draw()`: Renderiza el objeto
+- `on_collide()`: Responde a colisiones
 
 ### Clases Derivadas
 
@@ -75,29 +112,35 @@ graph TD
    - Configuración de ventana y recursos
    - Creación de objetos iniciales
    - Registro de objetos en el motor
+   - Inicialización de DeltaTime
 
 2. **Bucle Principal (`run`)**
 
    - Control de FPS
    - Gestión del ciclo de juego
+   - Actualización de DeltaTime
 
-3. **Manejo de Eventos (`handle_events`)**
+3. **Manejo de Eventos (`process_events`)**
 
    - Eventos de sistema (cierre, redimensión)
    - Eventos de entrada (teclado, ratón)
+   - Teclas especiales (P para pausa, F3 para modo debug)
    - Eventos personalizados
 
 4. **Actualización (`update`)**
 
    - Actualización de objetos registrados
+   - Detección de colisiones
    - Lógica específica del juego
+   - Limpieza de objetos marcados para destrucción
 
 5. **Renderizado (`render`)**
 
    - Dibujado de fondo
-   - Dibujado de hitboxes (modo depuración)
    - Dibujado de objetos
-   - Dibujado de UI
+   - Dibujado de hitboxes (modo depuración)
+   - Dibujado de UI y estadísticas
+   - Escalado del área virtual a la ventana real
 
 6. **Limpieza (`cleanup`)**
    - Liberación de recursos
@@ -119,24 +162,36 @@ graph TD
 
 1. **Creación (`__init__`)**
 
-   - Configuración inicial
-   - Carga de recursos
-   - Definición de hitbox
+   - Configuración inicial (posición, tipo)
+   - Configuración de hitbox personalizado
+   - Carga de imagen
+   - Inicialización de velocidad y rotación
 
 2. **Registro en Motor (`register_object`)**
 
    - Añade el objeto a la lista de objetos gestionados
+   - Establece referencia al juego
 
 3. **Actualización (`update` -> `on_update`)**
 
-   - Actualización común (`update`)
+   - Movimiento basado en delta time
+   - Rotación (si es necesaria)
+   - Actualización de hitbox
    - Actualización específica (`on_update`)
 
 4. **Renderizado (`draw`)**
 
    - Dibujado condicionado por visibilidad
+   - Dibujado de hitbox en modo debug
 
-5. **Desregistro y Eliminación (`unregister_object`)**
+5. **Colisiones (`detect_collisions` -> `on_collide`)**
+
+   - Detección de intersección de hitboxes
+   - Notificación a ambos objetos implicados
+   - Lógica específica en `on_collide`
+
+6. **Desregistro y Eliminación (`unregister_object`)**
+   - Marcado para eliminación (`should_destroy`)
    - Eliminación de la lista de objetos
    - Liberación de recursos
 
@@ -158,55 +213,91 @@ El sistema de eventos sigue una cadena de responsabilidad:
 └───────────────────┘
 ```
 
-El motor proporciona:
+El motor implementa:
 
-- **handle_events()**: Procesa eventos del sistema
-- **process_event()**: Hook para eventos específicos del juego
+- `process_events()`: Procesa eventos del sistema
+- `on_handle_event()`: Hook para eventos específicos del juego
+- `emit_event()`: Emite eventos a objetos registrados
+
+Eventos importantes:
+
+- `player_fire_missile`: Creación de misiles
+- `meteor_destroyed`: Meteorito destruido
+- `game_over`: Fin del juego
 
 ## Sistema de Renderizado
 
 El sistema de renderizado sigue un patrón de capas:
 
 ```
-┌─────────────────────────────────────┐
-│ Background (Fondo del juego)        │
-├─────────────────────────────────────┤
-│ Debug (Hitboxes si están activadas) │
-├─────────────────────────────────────┤
-│ Game Objects (Objetos del juego)    │
-├─────────────────────────────────────┤
-│ Foreground (UI, efectos, etc.)      │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ Background (Fondo del juego)            │
+├─────────────────────────────────────────┤
+│ Game Objects (Objetos del juego)        │
+├─────────────────────────────────────────┤
+│ Debug (Hitboxes si están activadas)     │
+├─────────────────────────────────────────┤
+│ Foreground (UI, efectos, HUD)           │
+└─────────────────────────────────────────┘
 ```
 
-El motor proporciona:
+Características importantes:
 
-- **render()**: Gestión general del renderizado
-- **on_render_background()**: Renderizado del fondo
-- **on_render_foreground()**: Renderizado de elementos en primer plano
+- **Área virtual**: El juego se renderiza en una superficie virtual (`game_surface`)
+- **Escalado**: Esta superficie se escala a la ventana real
+- **HUD separado**: El HUD se renderiza directamente en la ventana principal
+- **Modo debug**: Información técnica como FPS, hitboxes, etc.
 
 ## Sistema de Colisiones
 
-El sistema de colisiones utiliza hitboxes rectangulares:
+El sistema de colisiones utiliza hitboxes rectangulares personalizables:
 
 ```
-┌─────────────┐
-│             │
-│    Sprite   │   ┌──────┐
-│             │   │Hitbox│
-│             │   └──────┘
-└─────────────┘
+┌─────────────────┐
+│                 │
+│    Sprite       │   ┌──────┐
+│                 │   │Hitbox│
+│                 │   └──────┘
+└─────────────────┘
 ```
 
 Características:
 
-- **Hitboxes ajustables**: Por escala o padding
-- **Colisiones precisas**: Más pequeñas que los sprites
-- **Depuración visual**: Modo para mostrar hitboxes
+- **Hitboxes configurables**: Ancho, alto y offset desde el centro
+- **Datos desde JSON**: Configuración cargada desde `entities_config.json`
+- **Modo Debug**: Visualización de hitboxes y puntos centrales
+- **Detección eficiente**: Solo verifica colisiones entre objetos activos
+- **Respuesta por tipo**: Diferentes reacciones según el tipo de objetos
+
+## Sistema Delta Time
+
+El sistema Delta Time asegura un movimiento consistente independientemente de los FPS:
+
+```python
+# En vez de:
+x += 5  # 5 píxeles por frame (inconsistente con FPS variables)
+
+# Se usa:
+x += speed * DeltaTime.get_delta()  # Consistente a cualquier FPS
+```
+
+Características:
+
+- **Independencia de FPS**: Movimiento consistente a cualquier velocidad de fotogramas
+- **Singleton estático**: Accesible desde cualquier parte del código
+- **Límite de delta**: Evita saltos grandes durante lag
+
+## Gestión de Recursos
+
+El `ResourceManager` proporciona carga y caché de recursos:
+
+- **Imágenes**: Carga, escalado y caché con transparencia
+- **Sonidos**: Carga y reproducción
+- **Fuentes**: Gestión de fuentes con tamaños específicos
 
 ## Patrones de Diseño Implementados
 
-### Patrón Hollywood
+### Patrón Hollywood ("Don't call us, we'll call you")
 
 El motor llama a los métodos de los objetos, no al revés.
 
@@ -219,6 +310,7 @@ Objetos se registran en el motor y reciben notificaciones.
 
 - **register_object()**
 - **unregister_object()**
+- **emit_event()**
 
 ### Patrón Template Method
 
@@ -226,6 +318,13 @@ Define el esqueleto de un algoritmo en un método, delegando algunos pasos a las
 
 - **update() → on_update()**
 - **render() → on_render_background() → on_render_foreground()**
+
+### Patrón Singleton
+
+Clases con instancia única y acceso global.
+
+- **Config**: Configuración del juego
+- **DeltaTime**: Gestión de tiempo entre frames
 
 ## Buenas Prácticas
 
@@ -238,12 +337,16 @@ Define el esqueleto de un algoritmo en un método, delegando algunos pasos a las
 
    - Registrar objetos al crearlos
    - Desregistrar objetos al destruirlos
+   - Usar DeltaTime para movimiento
 
 3. **Separación de responsabilidades**
 
    - El motor gestiona el ciclo de vida
    - Los objetos implementan su comportamiento específico
+   - La configuración se carga desde archivos externos (JSON)
 
 4. **Evitar acoplamiento**
+
    - Usar interfaces claras entre capas
+   - Utilizar el sistema de eventos para comunicación
    - Evitar dependencias circulares

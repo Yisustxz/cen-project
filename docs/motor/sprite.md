@@ -80,24 +80,39 @@ def set_rotation(self, angle, speed=0)
 ### Configuración de Hitbox
 
 ```python
-def create_hitbox(self, scale=None, padding=None)
+def set_hitbox_data(self, data)
 ```
 
-**Propósito**: Crear o actualizar la hitbox basada en la imagen actual.
+**Propósito**: Establecer los datos de la hitbox personalizada. Este método DEBE ser llamado para tener un hitbox válido.
 
 **Parámetros**:
 
-- `scale`: Factor de escala (1.0 = tamaño completo de la imagen)
-- `padding`: Padding negativo (reducción) o positivo (expansión) en píxeles
+- `data` (dict): Diccionario con datos de configuración de la hitbox
+  - Debe contener: `width`/`height` (dimensiones exactas de la hitbox)
+  - Opcional: `offset_x`/`offset_y` (desplazamiento desde el centro)
 
-**Ejemplo**:
+**Comportamiento**:
+
+1. Guarda los datos proporcionados
+2. Activa el sistema de hitbox (`self.has_hitbox = True`)
+3. Llama a `update_hitbox()` para aplicar la configuración
+
+**Ejemplo de uso**:
 
 ```python
-# Crear una hitbox más pequeña que la imagen (para colisiones más precisas)
-self.create_hitbox(padding=-10)  # 10 píxeles menos en cada lado
+# Hitbox sencilla
+self.set_hitbox_data({
+    "width": 20,
+    "height": 40
+})
 
-# Crear una hitbox escalada (útil para objetos con formas complejas)
-self.create_hitbox(scale=0.8)  # 80% del tamaño de la imagen
+# Hitbox con offset para ajuste fino
+self.set_hitbox_data({
+    "width": 20,
+    "height": 40,
+    "offset_x": 5,
+    "offset_y": -3
+})
 ```
 
 ## Ciclo de Vida del Objeto
@@ -304,7 +319,10 @@ class Enemy(GameObject):
         super().__init__(x, y, image, "enemy")
 
         # Configurar hitbox más pequeña
-        self.create_hitbox(padding=-5)
+        self.set_hitbox_data({
+            "width": 20,
+            "height": 40
+        })
 
         # Configurar rotación
         self.set_rotation(0, 2)  # Rotar 2 grados por frame

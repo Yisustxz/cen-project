@@ -36,34 +36,52 @@ Cada GameObject tiene una hitbox definida por:
 
 - `hitbox`: Un rectángulo de Pygame (pygame.Rect)
 - `has_hitbox`: Un booleano que indica si la hitbox está activa
-- `hitbox_scale`: Factor de escala para la hitbox (1.0 = tamaño completo)
-- `hitbox_padding`: Padding en píxeles (+ = expansión, - = reducción)
+- `hitbox_data`: Un diccionario con los datos de configuración de la hitbox
 
 ### Creación y Configuración
 
 ```python
-def create_hitbox(self, scale=None, padding=None)
+def set_hitbox_data(self, data)
 ```
 
-**Propósito**: Crear o actualizar la hitbox basada en la imagen actual.
+**Propósito**: Establecer los datos de la hitbox personalizada. Este método DEBE ser llamado para tener un hitbox válido.
 
 **Parámetros**:
 
-- `scale`: Factor de escala (1.0 = tamaño completo)
-- `padding`: Padding en píxeles (- = reducción, + = expansión)
+- `data`: Diccionario con datos de configuración de la hitbox
+  - Debe contener: `width`/`height` (dimensiones exactas de la hitbox)
+  - Opcional: `offset_x`/`offset_y` (desplazamiento desde el centro)
 
 **Ejemplos**:
 
 ```python
-# Hitbox más pequeña (para colisiones más precisas)
-self.create_hitbox(padding=-10)  # 10 píxeles menos en cada lado
+# Hitbox personalizada con dimensiones específicas
+self.set_hitbox_data({
+    "width": 20,
+    "height": 40
+})
 
-# Hitbox de un porcentaje del tamaño
-self.create_hitbox(scale=0.8)  # 80% del tamaño del sprite
-
-# Hitbox más grande (para áreas de detección)
-self.create_hitbox(padding=5)  # 5 píxeles más en cada lado
+# Hitbox con desplazamiento respecto al centro
+self.set_hitbox_data({
+    "width": 20,
+    "height": 40,
+    "offset_x": 5,
+    "offset_y": -3
+})
 ```
+
+### Actualización de la Hitbox
+
+```python
+def update_hitbox(self)
+```
+
+**Propósito**: Actualiza la posición de la hitbox basada en la posición del objeto y los datos de hitbox configurados.
+
+**Notas**:
+
+- La hitbox no rota cuando el sprite rota
+- Esta función se llama automáticamente cuando cambia la posición del objeto
 
 ### Activación/Desactivación
 
@@ -77,7 +95,7 @@ def disable_hitbox(self)
 def enable_hitbox(self)
 ```
 
-**Propósito**: Activar la hitbox (objeto colisionable).
+**Propósito**: Activar la hitbox si hay datos de hitbox disponibles (objeto colisionable).
 
 ## Detección de Colisiones
 
@@ -250,66 +268,63 @@ El sistema incluye varias optimizaciones para mejorar el rendimiento:
 # En la clase Missile
 def on_collide(self, other_entity):
     if other_entity.type == "meteor":
-        # El misil impacta y se destruye
-        self.should_destroy = True
-        # Notificar al juego para efectos visuales
-        if self.game:
-            self.game.emit_event("impact", {
-                "x": self.x,
-                "y": self.y,
-                "projectile": self,
-                "target": other_entity
-            })
+        # Notificar al juego que el misil impactó
+        self.game.emit_event("missile_hit", {
+            "missile": self,
+            "meteor": other_entity
+        })
         return True
-    return False
 ```
 
-### Jugador recoge PowerUp
+### Jugador recoge Power-up
 
 ```python
 # En la clase PowerUp
 def on_collide(self, other_entity):
     if other_entity.type == "player":
-        # Aplicar efecto al jugador
-        if self.apply_effect(other_entity):
-            # Notificar al juego
-            if self.game:
-                self.game.emit_event("powerup_collected", {
-                    "type": self.powerup_type,
-                    "x": self.x,
-                    "y": self.y
-                })
-            # Eliminar el powerup
-            self.kill()
-            return True
+        # Aplicar poder al jugador
+        other_entity.apply_powerup(self.powerup_type)
+
+        # Notificar al juego
+        self.game.emit_event("powerup_collected", {
+            "powerup_type": self.powerup_type,
+            "player": other_entity
+        })
+
+        # Destruir el powerup
+        self.destroy()
+        return True
     return False
 ```
 
-### Jugador golpeado por Enemigo
+### Jugador impacta Enemigo
 
 ```python
 # En la clase Player
 def on_collide(self, other_entity):
     if other_entity.type == "meteor" and self.invincibility_frames == 0:
-        # Si tiene escudo, consumir un impacto
-        if self.shield_remaining > 0:
-            self.shield_remaining -= 1
-            # Breve invencibilidad
-            self.invincibility_frames = 20
-            return True
-        else:
-            # Sin escudo, perder vida
-            self.lives -= 1
-            self.invincibility_frames = 50
-            return True
+        # Recibir daño
+        self.take_damage()
+
+        # Notificar al juego
+        self.game.emit_event("player_hit", {
+            "player": self,
+            "meteor": other_entity
+        })
+        return True
     return False
 ```
 
-## Buenas Prácticas
+## Consideraciones Importantes
 
-1. **Ajustar hitboxes adecuadamente**: Hitboxes más pequeñas que los sprites para mejor precisión
-2. **Devolver True al manejar colisiones**: Esto ayuda a evitar manejadores duplicados
-3. **No abusar de las colisiones**: Para detecciones de área considerar otros métodos
-4. **Usar invencibilidad temporal**: Especialmente tras recibir daño, para evitar múltiples golpes
-5. **Optimizar la detección**: Si hay muchos objetos, considerar técnicas como partición espacial
-6. **Código de manejo claro**: Mantener los manejadores de colisión simples y directos
+1. **Rendimiento**: Evitar realizar operaciones costosas en métodos `on_collide()`, ya que pueden ejecutarse muchas veces por frame
+
+2. **Manejo Bidireccional**: Recordar que ambos objetos en una colisión reciben la notificación, por lo que el manejo debe coordinarse para evitar efectos duplicados
+
+3. **Prioridad de Respuesta**: Por convención, el objeto con más "autoridad" sobre la colisión debería manejarla, por ejemplo:
+
+   - Power-ups manejan colisión con jugador
+   - Misiles manejan colisión con meteoritos
+   - Jugador maneja colisión con enemigos
+
+4. **Hitboxes Estáticas**: Las hitboxes no rotan con el sprite, lo que mantiene el comportamiento consistente aunque la imagen rote

@@ -18,11 +18,7 @@ class Player(GameObject):
         
         # Guardar datos del hitbox personalizado
         self.hitbox_data = PlayerData.get_player_hitbox_data()
-        
-        # Asegurarse de que se usen los valores de offset
-        self.offset_x = self.hitbox_data.get("offset_x", 0)
-        self.offset_y = self.hitbox_data.get("offset_y", 0)
-        
+
         # Atributos específicos del jugador desde la configuración
         self.lives = PlayerData.get_player_lives()
         self.score = 0
@@ -155,12 +151,12 @@ class Player(GameObject):
         level_width = Config.get_level_width()
         
         # Mover nave a la izquierda
-        if keys[K_LEFT] and self.x > 0 - self.offset_x:
+        if keys[K_LEFT] and self.x + self.hitbox_data['offset_x']//2 > 0:
             self.set_velocity(-speed, 0)
             action_performed = True
             
         # Mover nave a la derecha
-        elif keys[K_RIGHT] and self.x + self.hitbox_data["width"] + self.offset_x < level_width:
+        elif keys[K_RIGHT] and self.x + self.hitbox_data['offset_x']//2 + self.hitbox_data['width'] < level_width:
             self.set_velocity(speed, 0)
             action_performed = True
             
@@ -175,7 +171,7 @@ class Player(GameObject):
             if current_time - self.last_missile > self.missile_cooldown:
                 if self.game:
                     # Emitir evento para crear un misil
-                    missile_x = self.x + (self.hitbox_data["width"] // 2) + self.offset_x
+                    missile_x = self.x + self.hitbox_data["offset_x"]
                     self.game.emit_event("player_fire_missile", {
                         "x": missile_x,
                         "y": self.y

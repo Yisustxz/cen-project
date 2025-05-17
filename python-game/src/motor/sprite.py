@@ -183,8 +183,8 @@ class GameObject(pygame.sprite.Sprite):
         self.hitbox = pygame.Rect(0, 0, width, height)
         
         # Centrar hitbox respecto a la posición del objeto
-        self.hitbox.centerx = self.x + (self.hitbox_data.get("width", 10) // 2) + offset_x
-        self.hitbox.centery = self.y + (self.hitbox_data.get("height", 10) // 2) + offset_y
+        self.hitbox.centerx = self.x + offset_x
+        self.hitbox.centery = self.y + offset_y
     
     def create_custom_hitbox(self, data):
         """

@@ -6,9 +6,9 @@ El sistema de colisiones en Space Shooter maneja la detección y respuesta a las
 
 El sistema de colisiones está diseñado con los siguientes objetivos:
 
-- **Precisión**: Proporcionar detección de colisiones precisa con diferentes tipos de hitboxes
+- **Precisión**: Proporcionar detección de colisiones precisa utilizando hitboxes personalizadas
 - **Eficiencia**: Optimizar el rendimiento evitando comprobaciones innecesarias
-- **Flexibilidad**: Soportar diferentes formas de hitboxes (rectangulares y circulares)
+- **Consistencia**: Mantener hitboxes que no roten con los sprites para un comportamiento predecible
 - **Extensibilidad**: Permitir añadir nuevos tipos de colisiones fácilmente
 - **Visualización**: Ofrecer ayudas visuales en modo debug para depurar colisiones
 
@@ -25,16 +25,16 @@ El sistema de colisiones está diseñado con los siguientes objetivos:
                           +------------------+
                           |    GameObject    |
                           +------------------+
-                          | is_colliding()   |
+                          | set_hitbox_data()|
+                          | collides_with()  |
                           | on_collide()     |
-                          | on_debug_draw()  |
+                          | update_hitbox()  |
                           +------------------+
                                ^       ^
                               /         \
               +-------------+           +---------------+
-              |  RectHitbox |           |  CircleHitbox |
+              |  Player     |           | Meteor        |
               +-------------+           +---------------+
-              | Player      |           | Meteor        |
               | Missile     |           |               |
               | PowerUp     |           |               |
               +-------------+           +---------------+
@@ -48,332 +48,246 @@ El sistema de colisiones está diseñado con los siguientes objetivos:
 4. **Notificación**: Se informa a ambos objetos involucrados
 5. **Respuesta**: Cada objeto implementa su respuesta específica a la colisión
 
-## Tipos de Hitboxes
+## Sistema de Hitboxes
 
-### Hitbox Rectangular
+Todas las entidades del juego utilizan un sistema unificado de hitboxes rectangulares que no rotan con el sprite.
 
-Utilizada principalmente por:
+### Configuración de la Hitbox
 
-- Nave del jugador
-- Misiles
-- Power-ups
-- Elementos de interfaz
-
-**Implementación**:
+Cada entidad define sus datos de hitbox mediante un diccionario con las siguientes propiedades:
 
 ```python
-def is_colliding(self, other_entity):
-    # Comprobación básica
-    if not self.collidable or not other_entity.collidable:
-        return False
-
-    # Comprobación específica para hitboxes circulares
-    if hasattr(other_entity, 'hitbox_radius'):
-        return self._rect_circle_collision(other_entity)
-
-    # Colisión entre rectángulos
-    return self.rect.colliderect(other_entity.rect)
+hitbox_data = {
+    "width": 20,     # Ancho de la hitbox en píxeles
+    "height": 40,    # Alto de la hitbox en píxeles
+    "offset_x": 0,   # Desplazamiento horizontal (opcional, 0 por defecto)
+    "offset_y": 0    # Desplazamiento vertical (opcional, 0 por defecto)
+}
 ```
 
-### Hitbox Circular
+### Aplicación de la Hitbox
 
-Utilizada principalmente por:
-
-- Meteoritos (para colisiones más precisas con formas irregulares)
-
-**Implementación**:
+Para aplicar la hitbox a una entidad, se usa el método `set_hitbox_data()`:
 
 ```python
-def is_colliding(self, other_entity):
-    # Comprobación básica
-    if not self.collidable or not other_entity.collidable:
-        return False
+def __init__(self, x, y):
+    super().__init__(x, y, None, "player")
 
-    # Distancia entre centros
-    dx = self.rect.centerx - other_entity.rect.centerx
-    dy = self.rect.centery - other_entity.rect.centery
-    distance = math.sqrt(dx * dx + dy * dy)
+    # Cargar datos de configuración
+    self.hitbox_data = PlayerData.get_player_hitbox_data()
 
-    # Colisión con otro objeto circular
-    if hasattr(other_entity, 'hitbox_radius'):
-        return distance < (self.hitbox_radius + other_entity.hitbox_radius)
-
-    # Colisión con rectángulo
-    return self._circle_rect_collision(other_entity)
+    # Aplicar hitbox
+    self.set_hitbox_data(self.hitbox_data)
 ```
 
-### Colisiones Mixtas
+### Actualización Automática
 
-#### Círculo-Rectángulo
+La posición de la hitbox se actualiza automáticamente cuando:
 
-```python
-def _circle_rect_collision(self, rect_entity):
-    """Detección de colisión entre un círculo y un rectángulo"""
-    # Encontrar el punto más cercano del rectángulo al centro del círculo
-    closest_x = max(rect_entity.rect.left, min(self.rect.centerx, rect_entity.rect.right))
-    closest_y = max(rect_entity.rect.top, min(self.rect.centery, rect_entity.rect.bottom))
+- La entidad se mueve
+- La entidad cambia de posición
+- Se llama a `update()` en cada frame
 
-    # Calcular distancia entre el centro del círculo y el punto más cercano
-    dx = self.rect.centerx - closest_x
-    dy = self.rect.centery - closest_y
-    distance = math.sqrt(dx * dx + dy * dy)
+El sistema garantiza que la hitbox mantiene su forma, incluso cuando la imagen del sprite rota.
 
-    # Colisión si la distancia es menor que el radio
-    return distance < self.hitbox_radius
-```
-
-## Implementación en el Motor
-
-### En GameEngine
-
-```python
-def update(self):
-    """Actualiza la lógica del juego y detecta colisiones"""
-    # Actualizar todos los objetos
-    self.objects_manager.update()
-
-    # Detectar colisiones solo si no está en pausa
-    if not self.paused:
-        self.objects_manager.detect_collisions()
-```
-
-### En ObjectsManager
-
-```python
-def detect_collisions(self):
-    """Detecta colisiones entre objetos registrados"""
-    # Filtrar objetos colisionables y visibles
-    collidable_objects = [obj for obj in self.objects if obj.collidable and obj.visible]
-
-    # Comprobación de colisiones
-    for i, obj1 in enumerate(collidable_objects):
-        for obj2 in collidable_objects[i+1:]:
-            # Evitar comprobaciones innecesarias entre objetos del mismo tipo
-            if self._should_check_collision(obj1, obj2):
-                # Comprobar colisión
-                if obj1.is_colliding(obj2):
-                    # Notificar a ambos objetos
-                    obj1.on_collide(obj2)
-                    obj2.on_collide(obj1)
-```
-
-```python
-def _should_check_collision(self, obj1, obj2):
-    """Determina si dos objetos deberían comprobar colisión"""
-    # Ejemplo: Los misiles del jugador no colisionan entre sí
-    if hasattr(obj1, 'entity_type') and hasattr(obj2, 'entity_type'):
-        if obj1.entity_type == 'missile' and obj2.entity_type == 'missile':
-            return False
-
-    # Otros casos específicos...
-
-    return True
-```
-
-## Respuesta a Colisiones
-
-Cada tipo de entidad implementa su propio comportamiento en respuesta a colisiones:
+## Implementación por Entidades
 
 ### Jugador (Player)
 
 ```python
+def __init__(self, x, y):
+    super().__init__(x, y, None, "player")
+
+    # Cargar datos de configuración
+    self.hitbox_data = PlayerData.get_player_hitbox_data()
+
+    # Aplicar hitbox
+    self.set_hitbox_data(self.hitbox_data)
+
 def on_collide(self, other_entity):
     """Maneja colisiones con otros objetos"""
-    if hasattr(other_entity, 'entity_type'):
-        # Colisión con meteorito
-        if other_entity.entity_type == 'meteor':
-            self.take_damage()
+    if other_entity.type == "meteor" and self.invincibility_frames == 0:
+        self.take_damage()
+        return True
+    return False
 ```
 
 ### Meteorito (Meteor)
 
 ```python
+def __init__(self, image, meteor_type, data, position, speed, rotation):
+    # Posición proporcionada por el meteor_manager
+    x, y = position
+
+    # Guardar los datos para la hitbox
+    self.hitbox_data = data
+
+    # Inicializar GameObject
+    super().__init__(x, y, image, obj_type="meteor")
+
+    # Aplicar hitbox usando los datos de configuración
+    self.set_hitbox_data(self.hitbox_data)
+
 def on_collide(self, other_entity):
     """Maneja colisiones con otros objetos"""
-    if hasattr(other_entity, 'entity_type'):
-        # Colisión con misil
-        if other_entity.entity_type == 'missile':
-            # El misil maneja el daño
-            pass
-        # Colisión con jugador
-        elif other_entity.entity_type == 'player':
-            # El jugador maneja el daño
-            pass
+    if other_entity.type == "missile":
+        # Obtener el daño desde el misil
+        missile_damage = other_entity.get_damage() if hasattr(other_entity, 'get_damage') else 1
+        return self.take_damage(missile_damage)
+    return False
 ```
 
 ### Misil (Missile)
 
 ```python
+def __init__(self, x, y):
+    # Inicializar primero sin imagen
+    super().__init__(x, y, None, obj_type="missile")
+
+    # Cargar datos de configuración
+    self.hitbox_data = PlayerData.get_missile_hitbox_data()
+
+    # Reducir el tamaño del hitbox para mayor precisión
+    self.hitbox_data["width"] = int(self.hitbox_data["width"] * 0.7)
+    self.hitbox_data["height"] = int(self.hitbox_data["height"] * 0.7)
+
+    # Aplicar hitbox con los datos ajustados
+    self.set_hitbox_data(self.hitbox_data)
+
 def on_collide(self, other_entity):
     """Maneja colisiones con otros objetos"""
-    if hasattr(other_entity, 'entity_type'):
-        # Ignorar colisión con el propietario
-        if other_entity == self.owner:
-            return
-
-        # Colisión con meteorito
-        if other_entity.entity_type == 'meteor':
-            # Aplicar daño al meteorito
-            was_destroyed = other_entity.take_damage(self.damage)
-
-            # Explotar misil
-            self.explode()
-
-            # Asignar puntos al jugador
-            if was_destroyed and self.owner and hasattr(self.owner, 'add_score'):
-                self.owner.add_score(other_entity.score_value)
-```
-
-### Power-Up
-
-```python
-def on_collide(self, other_entity):
-    """Maneja colisiones con otros objetos"""
-    if hasattr(other_entity, 'entity_type') and other_entity.entity_type == 'player':
-        # Aplicar efecto al jugador
-        self.apply_effect(other_entity)
-
-        # Emitir evento
-        self.emit_event("powerup_collected", {
-            "type": self.type,
-            "position": (self.rect.centerx, self.rect.centery)
-        })
-
-        # Eliminar power-up
+    if other_entity.type == "meteor" and not self.has_hit:
+        self.has_hit = True
         self.should_destroy = True
+        return True
+    return False
 ```
 
 ## Visualización de Hitboxes
 
-En modo debug, las hitboxes se visualizan para facilitar la depuración:
+En modo debug (F3), el juego muestra las hitboxes de todos los objetos:
 
 ```python
-def on_debug_draw(self, surface):
-    """Dibuja las hitboxes en modo debug"""
-    if hasattr(self, 'hitbox_radius'):
-        # Dibujar hitbox circular
-        pygame.draw.circle(
-            surface,
-            (255, 0, 0),  # Color rojo
-            (self.rect.centerx, self.rect.centery),
-            self.hitbox_radius,
-            1  # Grosor de línea
-        )
-    else:
-        # Dibujar hitbox rectangular
-        pygame.draw.rect(
-            surface,
-            (0, 255, 0),  # Color verde
-            self.rect,
-            1  # Grosor de línea
-        )
+def draw_debug(self, surface):
+    """Dibuja información de depuración sobre el objeto"""
+    # Si no hay modo debug, no hacer nada
+    if not self.game or not self.game.debug_mode:
+        return
+
+    # Dibujar hitbox
+    self.draw_hitbox(surface)
+
+    # Mostrar centro del objeto
+    pygame.draw.circle(
+        surface,
+        self.DEBUG_SPRITE_CENTER_COLOR,
+        (int(self.x), int(self.y)),
+        self.DEBUG_CENTER_SIZE
+    )
 ```
 
-## Activación del Modo Debug
+## Consideraciones Especiales
+
+### Offset para Ajuste Fino
+
+Los valores `offset_x` y `offset_y` permiten ajustar con precisión la posición de la hitbox relativa al sprite:
 
 ```python
-# En GameEngine
-def toggle_debug(self):
-    """Activa/desactiva el modo debug"""
-    self.debug = not self.debug
-```
-
-## Optimizaciones
-
-### Particionado Espacial
-
-Para juegos con muchos objetos, se implementa un sistema de particionado espacial:
-
-```python
-def detect_collisions_optimized(self):
-    """Detecta colisiones usando particionado espacial"""
-    # Filtrar objetos colisionables y visibles
-    collidable_objects = [obj for obj in self.objects if obj.collidable and obj.visible]
-
-    # Crear particiones espaciales (cuadrícula)
-    grid_size = 100  # Tamaño de celda en píxeles
-    grid = {}
-
-    # Asignar objetos a celdas
-    for obj in collidable_objects:
-        # Calcular celdas que ocupa el objeto
-        cells = self._get_grid_cells(obj, grid_size)
-
-        # Añadir objeto a cada celda
-        for cell in cells:
-            if cell not in grid:
-                grid[cell] = []
-            grid[cell].append(obj)
-
-    # Comprobar colisiones solo entre objetos en las mismas celdas
-    checked_pairs = set()
-    for cell, cell_objects in grid.items():
-        for i, obj1 in enumerate(cell_objects):
-            for obj2 in cell_objects[i+1:]:
-                # Evitar comprobar la misma pareja dos veces
-                pair_id = tuple(sorted([id(obj1), id(obj2)]))
-                if pair_id in checked_pairs:
-                    continue
-
-                checked_pairs.add(pair_id)
-
-                # Comprobar colisión
-                if self._should_check_collision(obj1, obj2) and obj1.is_colliding(obj2):
-                    obj1.on_collide(obj2)
-                    obj2.on_collide(obj1)
-```
-
-### Filtrado de Colisiones por Tipo
-
-```python
-# Matriz de colisiones (qué tipos colisionan con qué otros)
-collision_matrix = {
-    'player': ['meteor', 'powerup'],
-    'missile': ['meteor'],
-    'meteor': ['player', 'missile'],
-    'powerup': ['player']
+# Ejemplo de configuración en entities_config.json
+"missile": {
+    "speed": 500,
+    "damage": 1,
+    "hitbox_width": 8,
+    "hitbox_height": 16,
+    "offset_x": -4,   # Ajusta 4 píxeles a la izquierda
+    "offset_y": -8    # Ajusta 8 píxeles hacia arriba
 }
-
-def _should_check_collision(self, obj1, obj2):
-    """Comprueba si dos objetos deben colisionar según su tipo"""
-    if hasattr(obj1, 'entity_type') and hasattr(obj2, 'entity_type'):
-        type1, type2 = obj1.entity_type, obj2.entity_type
-        return type2 in collision_matrix.get(type1, []) or type1 in collision_matrix.get(type2, [])
-    return True
 ```
 
-## Casos de Uso Comunes
+### Hitboxes Estáticas (No Rotantes)
 
-### Jugador vs Meteorito
+Una característica importante del sistema es que las hitboxes **NO rotan** cuando el sprite rota:
 
-1. El meteorito cae desde la parte superior
-2. La detección de colisiones detecta intersección entre hitboxes
-3. Se llama a `on_collide` en ambos objetos
-4. El jugador recibe daño o pierde una vida si no está protegido
-5. El meteorito continúa su trayectoria
+```python
+def update_rotation(self):
+    """
+    Actualiza la rotación de la imagen, pero NO DEL HITBOX.
+    El hitbox se mantiene con su forma y dimensiones originales.
+    """
+    if self.original_image is not None:
+        # Rotar la imagen
+        self.image = pygame.transform.rotate(self.original_image, self.angle)
+```
 
-### Misil vs Meteorito
+Esto proporciona un comportamiento consistente y predecible para las colisiones, independientemente de la rotación visual del objeto.
 
-1. El misil viaja hacia arriba
-2. Colisiona con un meteorito
-3. El misil aplica daño al meteorito
-4. El meteorito reduce su salud, posiblemente explotando
-5. El misil se destruye (explota)
-6. Si el meteorito es destruido, el jugador recibe puntos
+## Ejemplos Prácticos
 
-### Jugador vs Power-Up
+### Configuración de Hitbox para el Jugador
 
-1. El power-up cae desde arriba
-2. El jugador lo intercepta
-3. El power-up aplica su efecto al jugador
-4. El power-up se destruye
-5. Se muestra un mensaje indicando el efecto
+```python
+# En la clase Player
+def __init__(self, x, y):
+    super().__init__(x, y, None, "player")
+
+    # Cargar datos de configuración
+    self.hitbox_data = PlayerData.get_player_hitbox_data()
+
+    # Aplicar hitbox
+    self.set_hitbox_data(self.hitbox_data)
+```
+
+### Configuración de Hitbox para Meteoritos
+
+```python
+# En meteor_manager.py
+def create_meteor(self, meteor_type, position=None):
+    # Obtener datos de configuración
+    meteor_data = MeteorData.get_meteor_config(meteor_type)
+
+    # La configuración ya incluye los datos de hitbox:
+    # - hitbox_width
+    # - hitbox_height
+    # - offset_x
+    # - offset_y
+
+    # Crear el meteorito
+    meteor = Meteor(
+        self.resource_manager.get_meteor_image(meteor_type),
+        meteor_type,
+        meteor_data,  # Pasar los datos completos, incluyendo hitbox
+        position or self._generate_random_position(),
+        self._generate_random_speed(meteor_data),
+        self._generate_random_rotation(meteor_data)
+    )
+```
+
+### Configuración de Hitbox para Misiles
+
+```python
+# En la clase Missile
+def __init__(self, x, y):
+    super().__init__(x, y, None, obj_type="missile")
+
+    # Cargar datos de configuración
+    self.hitbox_data = PlayerData.get_missile_hitbox_data()
+
+    # Reducir el tamaño del hitbox para mayor precisión
+    self.hitbox_data["width"] = int(self.hitbox_data["width"] * 0.7)
+    self.hitbox_data["height"] = int(self.hitbox_data["height"] * 0.7)
+
+    # Ajustar offsets para centrar correctamente el hitbox
+    self.hitbox_data["offset_x"] = -4
+    self.hitbox_data["offset_y"] = -8
+
+    # Aplicar hitbox con los datos ajustados
+    self.set_hitbox_data(self.hitbox_data)
+```
 
 ## Buenas Prácticas
 
-1. **Hitboxes más pequeñas que los sprites**: Para mayor tolerancia y mejor jugabilidad
-2. **Distinción visual clara**: Hitboxes circulares en rojo, rectangulares en verde
-3. **Filtrado inteligente**: Evitar comprobaciones entre objetos que no interactúan
-4. **Optimización espacial**: Uso de técnicas como particionado espacial para juegos con muchos objetos
-5. **Feedback visual**: Proporcionar feedback al jugador durante colisiones (efectos de daño, explosiones)
-6. **Invencibilidad temporal**: Implementar períodos de invencibilidad tras recibir daño
+1. **Ser específico con las dimensiones**: Siempre definir dimensiones exactas de hitbox, no basarse en dimensiones de la imagen
+2. **Usar offsets para ajuste fino**: Utilizar offset_x y offset_y para posicionar con precisión la hitbox
+3. **Verificar colisiones visualmente**: Usar el modo debug (F3) para comprobar que las hitboxes se ajustan correctamente
+4. **Modularizar la configuración**: Mantener los datos de hitbox en archivos de configuración
+5. **Consistencia en la implementación**: Todas las entidades deben usar set_hitbox_data() para tener colliders válidos

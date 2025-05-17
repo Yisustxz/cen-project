@@ -18,10 +18,6 @@ class Missile(GameObject):
         
         # Ajustar el hitbox para hacerlo más pequeño
         self.hitbox_data = PlayerData.get_missile_hitbox_data()
-        # Reducir el ancho del hitbox
-        self.hitbox_data["width"] = int(self.hitbox_data["width"] * 0.7)
-        # Reducir el alto del hitbox
-        self.hitbox_data["height"] = int(self.hitbox_data["height"] * 0.7)
         
         # Obtener velocidad desde la configuración
         missile_speed = PlayerData.get_missile_speed()

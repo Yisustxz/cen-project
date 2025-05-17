@@ -1,8 +1,8 @@
 {
   "frontend": {
     "singlePlayerMode": {
-      "enable": false,
-      "skipMenu": false
+      "enable": true,
+      "skipMenu": true
     },
     "display": {
       "width": 800,

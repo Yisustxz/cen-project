@@ -19,8 +19,8 @@
         ],
         "hitbox_width": 48,
         "hitbox_height": 48,
-        "offset_x": 6,
-        "offset_y": 3
+        "offset_x": 30,
+        "offset_y": 27
       },
       "brown_big_2": {
         "image": "brown_big_2.png",
@@ -40,8 +40,8 @@
         ],
         "hitbox_width": 46,
         "hitbox_height": 46,
-        "offset_x": 7,
-        "offset_y": 5
+        "offset_x": 30,
+        "offset_y": 28
       },
       "brown_medium_1": {
         "image": "brown_medium_1.png",
@@ -61,8 +61,8 @@
         ],
         "hitbox_width": 32,
         "hitbox_height": 32,
-        "offset_x": 0,
-        "offset_y": 11
+        "offset_x": 16,
+        "offset_y": 27
       },
       "brown_medium_2": {
         "image": "brown_medium_2.png",
@@ -82,8 +82,8 @@
         ],
         "hitbox_width": 30,
         "hitbox_height": 30,
-        "offset_x": 1,
-        "offset_y": 1
+        "offset_x": 16,
+        "offset_y": 16
       },
       "brown_small_1": {
         "image": "brown_small_1.png",
@@ -103,8 +103,8 @@
         ],
         "hitbox_width": 20,
         "hitbox_height": 20,
-        "offset_x": -1,
-        "offset_y": 6
+        "offset_x": 9,
+        "offset_y": 16
       },
       "brown_small_2": {
         "image": "brown_small_2.png",
@@ -124,8 +124,8 @@
         ],
         "hitbox_width": 18,
         "hitbox_height": 18,
-        "offset_x": 0,
-        "offset_y": 3
+        "offset_x": 9,
+        "offset_y": 12
       },
       "brown_tiny_1": {
         "image": "brown_tiny_1.png",
@@ -145,8 +145,8 @@
         ],
         "hitbox_width": 14,
         "hitbox_height": 14,
-        "offset_x": 2,
-        "offset_y": 0
+        "offset_x": 9,
+        "offset_y": 7
       },
       "brown_tiny_2": {
         "image": "brown_tiny_2.png",
@@ -166,8 +166,8 @@
         ],
         "hitbox_width": 10,
         "hitbox_height": 10,
-        "offset_x": 2,
-        "offset_y": 6
+        "offset_x": 7,
+        "offset_y": 11
       },
       "grey_big_1": {
         "image": "grey_big_1.png",
@@ -187,8 +187,8 @@
         ],
         "hitbox_width": 26,
         "hitbox_height": 26,
-        "offset_x": 1,
-        "offset_y": 6
+        "offset_x": 14,
+        "offset_y": 19
       },
       "grey_big_2": {
         "image": "grey_big_2.png",
@@ -208,8 +208,8 @@
         ],
         "hitbox_width": 25,
         "hitbox_height": 25,
-        "offset_x": 1,
-        "offset_y": 5
+        "offset_x": 13,
+        "offset_y": 17
       },
       "grey_medium_1": {
         "image": "grey_medium_1.png",
@@ -229,8 +229,8 @@
         ],
         "hitbox_width": 25,
         "hitbox_height": 25,
-        "offset_x": 4,
-        "offset_y": 3
+        "offset_x": 16,
+        "offset_y": 15
       },
       "grey_medium_2": {
         "image": "grey_medium_2.png",
@@ -250,8 +250,8 @@
         ],
         "hitbox_width": 20,
         "hitbox_height": 20,
-        "offset_x": 6,
-        "offset_y": 8
+        "offset_x": 16,
+        "offset_y": 18
       },
       "grey_small_1": {
         "image": "grey_small_1.png",
@@ -271,8 +271,8 @@
         ],
         "hitbox_width": 25,
         "hitbox_height": 25,
-        "offset_x": 7,
-        "offset_y": -2
+        "offset_x": 19,
+        "offset_y": 10
       },
       "grey_small_2": {
         "image": "grey_small_2.png",
@@ -292,8 +292,8 @@
         ],
         "hitbox_width": 16,
         "hitbox_height": 16,
-        "offset_x": 0,
-        "offset_y": 0
+        "offset_x": 8,
+        "offset_y": 8
       },
       "grey_tiny_1": {
         "image": "grey_tiny_1.png",
@@ -313,8 +313,8 @@
         ],
         "hitbox_width": 16,
         "hitbox_height": 16,
-        "offset_x": 0,
-        "offset_y": 0
+        "offset_x": 8,
+        "offset_y": 8
       },
       "grey_tiny_2": {
         "image": "grey_tiny_2.png",
@@ -334,8 +334,8 @@
         ],
         "hitbox_width": 12,
         "hitbox_height": 12,
-        "offset_x": 2,
-        "offset_y": 2
+        "offset_x": 8,
+        "offset_y": 8
       }
     },
     "categories": {
@@ -392,15 +392,15 @@
     "damage_time": 2.0,
     "hitbox_width": 20,
     "hitbox_height": 40,
-    "offset_x": 10,
-    "offset_y": 0
+    "offset_x": 20,
+    "offset_y": 20
   },
   "missile": {
     "speed": 500,
     "damage": 1,
     "hitbox_width": 8,
     "hitbox_height": 16,
-    "offset_x": -2,
-    "offset_y": -2
+    "offset_x": 2,
+    "offset_y": 6
   }
 }

@@ -22,7 +22,7 @@ def init_pygame():
     pygame.display.set_caption(GAME_TITLE)
     return screen
 
-def main():
+def main(): 
     """Función principal del juego."""
     # Cargar configuración
     config.Config.load_config()
