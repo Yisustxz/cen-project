@@ -1,0 +1,1 @@
+"""Gestión de recursos gráficos y sonoros.""" 

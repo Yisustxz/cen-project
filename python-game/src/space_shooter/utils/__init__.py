@@ -1,0 +1,1 @@
+"""Funciones de utilidad generales.""" 

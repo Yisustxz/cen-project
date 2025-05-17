@@ -1,0 +1,13 @@
+{
+  "frontend": {
+    "singlePlayerMode": {
+      "enable": true,
+      "skipMenu": true
+    },
+    "display": {
+      "width": 800,
+      "height": 600,
+      "fullscreen": false
+    }
+  }
+} 

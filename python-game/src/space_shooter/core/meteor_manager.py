@@ -1,0 +1,159 @@
+"""
+Gestor de meteoritos para el juego Space Shooter.
+Encapsula toda la lógica relacionada con la creación y gestión de meteoritos.
+"""
+import random
+from space_shooter.entities.meteor import Meteor
+from space_shooter.data.meteor_data import MeteorData
+from space_shooter.core.constants import METEOR_SPAWN_FREQUENCY
+
+class MeteorManager:
+    """
+    Clase encargada de gestionar los meteoritos en el juego.
+    
+    Responsabilidades:
+    - Creación de meteoritos con diferentes tipos y propiedades
+    - Gestión del tiempo entre meteoritos
+    - Ajuste de dificultad (frecuencia, tipos)
+    """
+    
+    def __init__(self, game):
+        """
+        Inicializa el gestor de meteoritos.
+        
+        Args:
+            game: Referencia al juego principal (SpaceShooterGame)
+        """
+        self.game = game
+        self.resource_manager = game.resource_manager
+        self.spawn_timer = 0
+        self.spawn_frequency = METEOR_SPAWN_FREQUENCY
+        
+        # Variables para ajuste de dificultad
+        self.difficulty_factor = 1.0
+        self.min_spawn_frequency = 30  # Mínimo tiempo entre meteoritos
+        self.difficulty_increase_rate = 0.002  # Aumento de dificultad por frame
+        
+        # Pesos de probabilidad para diferentes tipos de meteoritos
+        self.meteor_weights = {
+            "big": 20,     # Meteoritos grandes: 20%
+            "medium": 35,  # Meteoritos medianos: 35%
+            "small": 30,   # Meteoritos pequeños: 30%
+            "tiny": 15     # Meteoritos diminutos: 15%
+        }
+        
+        # Pesos de probabilidad para colores
+        self.color_weights = {
+            "brown": 60,   # Marrón: 60%
+            "grey": 40     # Gris: 40%
+        }
+    
+    def update(self):
+        """
+        Actualiza el gestor de meteoritos.
+        Llamado en cada frame por SpaceShooterGame.
+        """
+        # Actualizar contador de creación
+        self.spawn_timer += 1
+        
+        # Aumentar dificultad gradualmente
+        if self.spawn_frequency > self.min_spawn_frequency:
+            self.spawn_frequency -= self.difficulty_increase_rate
+        
+        # Crear un nuevo meteorito si es el momento
+        if self.spawn_timer >= self.spawn_frequency:
+            self.create_meteor()
+            self.spawn_timer = 0
+    
+    def reset(self):
+        """Reinicia el gestor de meteoritos a sus valores iniciales."""
+        self.spawn_timer = 0
+        self.spawn_frequency = METEOR_SPAWN_FREQUENCY
+        self.difficulty_factor = 1.0
+    
+    def create_meteor(self, meteor_type=None):
+        """
+        Crea un meteorito y lo registra en el motor del juego.
+        
+        Args:
+            meteor_type: Tipo específico de meteorito (opcional)
+            
+        Returns:
+            Meteor: El meteorito creado, o None si hubo un error
+        """
+        print("Creando un nuevo meteorito...")
+        try:
+            # Si no se especifica tipo, seleccionar uno aleatorio
+            if meteor_type is None:
+                meteor_type = self._select_random_meteor_type()
+            
+            # Obtener datos para el tipo de meteorito
+            meteor_data = MeteorData.get_type_data(meteor_type)
+            
+            # Cargar imagen del meteorito
+            meteor_img = MeteorData.load_meteor_image(self.resource_manager, meteor_type)
+            
+            # Crear el meteorito con la imagen, tipo y datos
+            meteor = Meteor(meteor_img, meteor_type, meteor_data)
+            
+            # Registrar el meteorito en el motor
+            self.game.register_object(meteor)
+            
+            print(f"Meteorito tipo {meteor_type} creado correctamente.")
+            return meteor
+        except Exception as e:
+            print(f"Error al crear meteorito: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def on_meteor_destroyed(self, data):
+        """
+        Maneja el evento de destrucción de un meteorito.
+        
+        Args:
+            data: Datos del evento con points, x, y, meteor
+        """
+        # Posible lógica adicional aquí, como crear meteoritos secundarios,
+        # ajustar patrones de generación, etc.
+        pass
+    
+    def _select_random_meteor_type(self):
+        """
+        Selecciona un tipo de meteorito aleatorio basado en los pesos de probabilidad.
+        
+        Returns:
+            str: Tipo de meteorito (por ejemplo, "brown_big", "grey_small")
+        """
+        # Primero seleccionar tamaño
+        sizes = list(self.meteor_weights.keys())
+        size_weights = [self.meteor_weights[size] for size in sizes]
+        size = random.choices(sizes, weights=size_weights, k=1)[0]
+        
+        # Luego seleccionar color
+        colors = list(self.color_weights.keys())
+        color_weights = [self.color_weights[color] for color in colors]
+        color = random.choices(colors, weights=color_weights, k=1)[0]
+        
+        # Combinar en un tipo completo
+        return f"{color}_{size}"
+    
+    def increase_difficulty(self, amount=0.1):
+        """
+        Aumenta la dificultad del juego.
+        
+        Args:
+            amount: Cantidad de aumento de dificultad (valor entre 0.1 y 1.0)
+        """
+        self.difficulty_factor += amount
+        
+        # Ajustar pesos hacia meteoritos más pequeños y rápidos
+        if self.meteor_weights["big"] > 5:
+            self.meteor_weights["big"] -= amount * 10
+            self.meteor_weights["tiny"] += amount * 10
+        
+        # Ajustar pesos hacia más meteoritos grises (más resistentes)
+        if self.color_weights["grey"] < 60:
+            self.color_weights["grey"] += amount * 10
+            self.color_weights["brown"] -= amount * 10
+    

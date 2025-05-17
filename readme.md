@@ -4,7 +4,7 @@ Proyecto de Computacion en la nube para videojuego con grpc:
 
 - `proto/` - Definiciones .proto
 - `backend/` - Servidor Go
-- `frontend/` - Cliente Python
+- `python-game/` - Cliente Python
 
 se necesita
 go version go1.24.2 windows/amd64

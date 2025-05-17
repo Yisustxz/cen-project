@@ -1,3 +1,5 @@
+/*
+ANTIGUO CLIENTE PYTHON .py THIS IS UNSUED
 import sys
 import os
 import grpc
@@ -22,3 +24,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+*/
