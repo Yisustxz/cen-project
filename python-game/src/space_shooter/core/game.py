@@ -84,7 +84,7 @@ class SpaceShooterGame(GameEngine):
             elif event.key == K_n:
                 print("Saliendo del juego...")
                 self.quit()
-    
+
     def on_handle_inputs(self):
         """Gestiona entradas continuas del usuario."""
         # Si el juego está en curso, manejar las entradas específicas

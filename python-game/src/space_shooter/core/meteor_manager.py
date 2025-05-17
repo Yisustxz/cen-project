@@ -5,7 +5,7 @@ Encapsula toda la lógica relacionada con la creación y gestión de meteoritos.
 import random
 from space_shooter.entities.meteor import Meteor
 from space_shooter.data.meteor_data import MeteorData
-from space_shooter.core.constants import METEOR_SPAWN_FREQUENCY
+from space_shooter.core.constants import METEOR_SPAWN_FREQUENCY, GAME_WIDTH
 
 class MeteorManager:
     """
@@ -57,8 +57,9 @@ class MeteorManager:
         self.spawn_timer += 1
         
         # Aumentar dificultad gradualmente
-        if self.spawn_frequency > self.min_spawn_frequency:
-            self.spawn_frequency -= self.difficulty_increase_rate
+        # Comentado hasta que se implemente la señal del servidor
+        # if self.spawn_frequency > self.min_spawn_frequency:
+        #     self.spawn_frequency -= self.difficulty_increase_rate
         
         # Crear un nuevo meteorito si es el momento
         if self.spawn_timer >= self.spawn_frequency:
@@ -71,12 +72,13 @@ class MeteorManager:
         self.spawn_frequency = METEOR_SPAWN_FREQUENCY
         self.difficulty_factor = 1.0
     
-    def create_meteor(self, meteor_type=None):
+    def create_meteor(self, meteor_type=None, position=None):
         """
         Crea un meteorito y lo registra en el motor del juego.
         
         Args:
             meteor_type: Tipo específico de meteorito (opcional)
+            position: Posición inicial del meteorito (opcional)
             
         Returns:
             Meteor: El meteorito creado, o None si hubo un error
@@ -93,8 +95,18 @@ class MeteorManager:
             # Cargar imagen del meteorito
             meteor_img = MeteorData.load_meteor_image(self.resource_manager, meteor_type)
             
-            # Crear el meteorito con la imagen, tipo y datos
-            meteor = Meteor(meteor_img, meteor_type, meteor_data)
+            # Determinar propiedades aleatorias del meteorito
+            meteor_properties = self._determine_meteor_properties(meteor_data, position)
+            
+            # Crear el meteorito con la imagen, tipo, datos y propiedades
+            meteor = Meteor(
+                meteor_img, 
+                meteor_type, 
+                meteor_data,
+                meteor_properties["position"],
+                meteor_properties["speed"],
+                meteor_properties["rotation"]
+            )
             
             # Registrar el meteorito en el motor
             self.game.register_object(meteor)
@@ -106,6 +118,43 @@ class MeteorManager:
             import traceback
             traceback.print_exc()
             return None
+    
+    def _determine_meteor_properties(self, meteor_data, position=None):
+        """
+        Determina todas las propiedades aleatorias para un meteorito.
+        
+        Args:
+            meteor_data: Datos de configuración del tipo de meteorito
+            position: Posición inicial opcional (x, y)
+            
+        Returns:
+            dict: Diccionario con todas las propiedades aleatorias
+        """
+        # Determinar posición si no se proporciona
+        if position is None:
+            x = random.randint(0, GAME_WIDTH)
+            y = -100  # Inicio por encima de la pantalla
+            position = (x, y)
+        
+        # Obtener rangos de velocidad desde la configuración del meteoro
+        speed_x_range = meteor_data.get("speed_x_range", (-1, 1))
+        speed_y_range = meteor_data.get("speed_y_range", (1, 3))
+        rotation_range = meteor_data.get("rotation_speed_range", (-3, 3))
+        
+        # Determinar velocidades aleatorias
+        speed_x = random.uniform(speed_x_range[0], speed_x_range[1])
+        speed_y = random.uniform(speed_y_range[0], speed_y_range[1])
+        
+        # Determinar rotación aleatoria
+        angle = random.randint(0, 360)
+        rotation_speed = random.uniform(rotation_range[0], rotation_range[1])
+        
+        # Devolver todas las propiedades
+        return {
+            "position": position,
+            "speed": (speed_x, speed_y),
+            "rotation": (angle, rotation_speed)
+        }
     
     def on_meteor_destroyed(self, data):
         """
@@ -138,22 +187,25 @@ class MeteorManager:
         # Combinar en un tipo completo
         return f"{color}_{size}"
     
-    def increase_difficulty(self, amount=0.1):
-        """
-        Aumenta la dificultad del juego.
-        
-        Args:
-            amount: Cantidad de aumento de dificultad (valor entre 0.1 y 1.0)
-        """
-        self.difficulty_factor += amount
-        
-        # Ajustar pesos hacia meteoritos más pequeños y rápidos
-        if self.meteor_weights["big"] > 5:
-            self.meteor_weights["big"] -= amount * 10
-            self.meteor_weights["tiny"] += amount * 10
-        
-        # Ajustar pesos hacia más meteoritos grises (más resistentes)
-        if self.color_weights["grey"] < 60:
-            self.color_weights["grey"] += amount * 10
-            self.color_weights["brown"] -= amount * 10
+    # La función increase_difficulty está comentada para ser activada solo
+    # cuando se reciba una señal del servidor
+    #
+    # def increase_difficulty(self, amount=0.1):
+    #     """
+    #     Aumenta la dificultad del juego.
+    #     
+    #     Args:
+    #         amount: Cantidad de aumento de dificultad (valor entre 0.1 y 1.0)
+    #     """
+    #     self.difficulty_factor += amount
+    #     
+    #     # Ajustar pesos hacia meteoritos más pequeños y rápidos
+    #     if self.meteor_weights["big"] > 5:
+    #         self.meteor_weights["big"] -= amount * 10
+    #         self.meteor_weights["tiny"] += amount * 10
+    #     
+    #     # Ajustar pesos hacia más meteoritos grises (más resistentes)
+    #     if self.color_weights["grey"] < 60:
+    #         self.color_weights["grey"] += amount * 10
+    #         self.color_weights["brown"] -= amount * 10
     

@@ -1,7 +1,14 @@
 """Motor base para juegos en Pygame."""
 import pygame
 from pygame.locals import *
+import sys
+import os
+
+# Añadir el directorio src al path para poder importar
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from motor.objects_manager import ObjectsManager
+from space_shooter.utils.delta_time import DeltaTime
 import config
 
 class GameEngine:
@@ -15,11 +22,14 @@ class GameEngine:
             width: Ancho de la ventana
             height: Alto de la ventana
             title: Título de la ventana
-            fps: Frames por segundo
+            fps: Frames por segundo (valor por defecto, puede ser sobrescrito por la configuración)
         """
         print("Inicializando GameEngine...")
         # Inicializar Pygame
         pygame.init()
+        
+        # Inicializar el sistema de delta time
+        DeltaTime.init()
         
         # Configuración básica
         self.screen_size = (width, height)
@@ -29,7 +39,10 @@ class GameEngine:
         self.game_window = pygame.display.set_mode(self.screen_size, display_flags)
         
         pygame.display.set_caption(title)
-        self.fps = fps
+        
+        # Usar el límite de FPS de la configuración, o el valor por defecto si no está disponible
+        self.fps = config.Config.get_fps_limit() if hasattr(config.Config, 'get_fps_limit') else fps
+        print(f"FPS limitados a: {self.fps}")
         
         # Control del bucle del juego
         self.clock = pygame.time.Clock()
@@ -161,6 +174,9 @@ class GameEngine:
         Actualiza primero todos los objetos registrados, detecta colisiones y luego
         llama al método específico de la clase derivada.
         """
+        # Actualizar el sistema de delta time
+        DeltaTime.update()
+        
         # Actualizar todos los objetos registrados
         self.update_objects()
         
@@ -197,96 +213,121 @@ class GameEngine:
         # Permitir que las clases hijas realicen renderizado específico adicional
         self.on_render_foreground()
         
+        # Mostrar FPS en modo debug
+        if self.debug_mode:
+            font = pygame.font.Font(None, 24)
+            current_fps = int(self.clock.get_fps())
+            fps_text = f"FPS: {current_fps}/{self.fps} | Delta: {DeltaTime.get_delta():.4f}"
+            fps_color = (255, 255, 255) if current_fps <= self.fps else (255, 100, 100)  # Rojo si excede el límite
+            fps_surface = font.render(fps_text, True, fps_color)
+            self.game_window.blit(fps_surface, (10, 10))
+        
         # Actualizar la pantalla
         pygame.display.update()
     
     def on_render_background(self):
         """
         Renderiza elementos específicos del juego en el fondo.
-        Debe ser implementado por clases hijas si es necesario.
+        Debe ser implementado por clases hijas.
         """
         pass
     
     def on_render_foreground(self):
         """
-        Renderiza elementos específicos del juego en primer plano.
-        Debe ser implementado por clases hijas si es necesario.
+        Renderiza elementos específicos del juego en el primer plano.
+        Debe ser implementado por clases hijas.
         """
         pass
     
     def run(self):
-        """Ejecuta el bucle principal del juego."""
-        print("Iniciando bucle principal del juego...")
-        # Llamar a cualquier inicialización específica del juego
+        """Inicia el bucle principal del juego."""
+        print("Iniciando bucle del juego...")
+        
+        # Inicializar recursos específicos del juego
         self.init_game()
         
-        # Bucle principal (Main Bucle)
-        while self.running:
-            # Controlar FPS
-            self.clock.tick(self.fps)
-            
-            # 1. Manejar eventos
-            self.handle_events()
-            
-            # 2. Saltar la actualización si el juego está en pausa
-            if not self.paused:
-                # 2. Actualizar lógica
-                self.update()
+        # Bucle principal del juego
+        try:
+            while self.running:
+                # Manejar eventos
+                self.handle_events()
                 
-                # 3. Renderizar
+                # Si no está pausado, actualizar la lógica
+                if not self.paused:
+                    self.update()
+                
+                # Renderizar
                 self.render()
+                
+                # Controlar FPS
+                self.clock.tick(self.fps)
         
-        print("Saliendo del juego...")
-        # Limpiar recursos cuando se cierra el juego
+        except Exception as e:
+            print(f"Error en el bucle principal: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Limpieza final
         self.cleanup()
         pygame.quit()
-        print("Juego cerrado correctamente.")
     
     def init_game(self):
         """
         Inicializa recursos específicos del juego.
         Debe ser implementado por clases hijas.
         """
-        print("Método init_game() básico llamado. Debería ser sobrescrito por una clase hija.")
         pass
     
     def cleanup(self):
         """
         Limpia recursos antes de cerrar.
-        Debe ser implementado por clases hijas si es necesario.
+        Debe ser implementado por clases hijas.
         """
-        print("Método cleanup() básico llamado.")
-        self.clear_objects()
+        pass
     
     def toggle_pause(self):
         """Alterna el estado de pausa del juego."""
         self.paused = not self.paused
-        print(f"Juego {'pausado' if self.paused else 'reanudado'}.")
+        print(f"Juego {'pausado' if self.paused else 'reanudado'}")
     
     def quit(self):
-        """Termina el juego."""
-        print("Método quit() llamado. Terminando el juego...")
+        """Detiene el bucle del juego."""
+        print("Saliendo del juego...")
         self.running = False
     
     def emit_event(self, event_type, data=None, target_type=None):
         """
-        Emite un evento a todos los objetos registrados o a un tipo específico.
+        Emite un evento a todos los objetos registrados o solo a un tipo específico.
         
         Args:
             event_type: Tipo de evento a emitir
             data: Datos asociados al evento (opcional)
-            target_type: Tipo de objeto al que dirigir el evento (opcional)
+            target_type: Tipo de objeto destinatario (opcional, si es None se envía a todos)
             
         Returns:
-            int: Número de objetos que manejaron el evento
+            bool: True si el evento fue emitido, False en caso contrario
         """
-        # Primero, intentar manejar el evento en el propio juego
-        method_name = f"on_{event_type}"
-        if hasattr(self, method_name) and callable(getattr(self, method_name)):
-            getattr(self, method_name)(data)
-        
-        # Luego, enviar el evento a los objetos
-        return self.objects_manager.emit_event(event_type, data, target_type)
+        try:
+            # Comprobar si existe un método específico para este evento
+            handler_method = f"on_{event_type}"
+            if hasattr(self, handler_method) and callable(getattr(self, handler_method)):
+                getattr(self, handler_method)(data)
+                
+            # Obtener objetos destinatarios
+            if target_type:
+                objects = self.objects_manager.get_objects_by_type(target_type)
+            else:
+                objects = self.objects_manager.get_objects()
+                
+            # Enviar el evento a cada objeto
+            for obj in objects:
+                if hasattr(obj, 'on_game_event'):
+                    obj.on_game_event(event_type, data)
+                    
+            return True
+        except Exception as e:
+            print(f"Error al emitir evento {event_type}: {e}")
+            return False
     
     def get_nearest_object(self, x, y, obj_type=None, max_distance=None):
         """

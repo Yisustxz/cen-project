@@ -1,7 +1,6 @@
 """
 Clase Meteor - Representa los meteoritos que caen durante el juego.
 """
-import random
 import pygame
 from motor.sprite import GameObject
 from space_shooter.core.constants import GAME_HEIGHT
@@ -9,7 +8,7 @@ from space_shooter.core.constants import GAME_HEIGHT
 class Meteor(GameObject):
     """Clase que representa los meteoritos en el juego."""
     
-    def __init__(self, image, meteor_type, data):
+    def __init__(self, image, meteor_type, data, position, speed, rotation):
         """
         Inicializa un nuevo meteorito.
         
@@ -17,10 +16,12 @@ class Meteor(GameObject):
             image: Imagen del meteorito
             meteor_type: Tipo de meteorito (brown_big, grey_small, etc.)
             data: Diccionario con los datos de configuración
+            position: Tupla (x, y) con la posición inicial del meteorito
+            speed: Tupla (speed_x, speed_y) con la velocidad en ambos ejes
+            rotation: Tupla (angle, speed) con el ángulo inicial y velocidad de rotación
         """
-        # Posición aleatoria en la parte superior de la pantalla
-        x = random.randint(0, 800)
-        y = -100
+        # Posición proporcionada por el meteor_manager
+        x, y = position
         
         # Llamar al constructor de la clase padre con la imagen y tipo
         super().__init__(x, y, image, obj_type="meteor")
@@ -28,19 +29,16 @@ class Meteor(GameObject):
         # Guardar tipo de meteorito
         self.meteor_type = meteor_type
         
-        # Configurar según los datos proporcionados
-        speed_x_range = data.get("speed_x_range", (-1, 1))
-        speed_y_range = data.get("speed_y_range", (1, 3))
-        rotation_range = data.get("rotation_speed_range", (-3, 3))
+        # Establecer velocidad utilizando el método heredado
+        self.set_velocity(speed[0], speed[1])
         
-        self.speed_x = random.uniform(speed_x_range[0], speed_x_range[1])
-        self.speed_y = random.uniform(speed_y_range[0], speed_y_range[1])
+        # Configurar según los datos proporcionados
         self.hp = data.get("hp", 1)
         self.points = data.get("points", 50)
         
-        # Configurar rotación aleatoria
-        rotation_speed = random.uniform(rotation_range[0], rotation_range[1])
-        self.set_rotation(random.randint(0, 360), rotation_speed)
+        # Configurar rotación proporcionada
+        angle, rotation_speed = rotation
+        self.set_rotation(angle, rotation_speed)
         
         # Crear hitbox ajustada
         padding = data.get("hitbox_padding", -5)
@@ -57,9 +55,7 @@ class Meteor(GameObject):
         Lógica específica de actualización del meteorito.
         Este método es llamado automáticamente por la clase base GameObject.
         """
-        # Mover el meteorito según su velocidad
-        self.x += self.speed_x
-        self.y += self.speed_y
+        # Ya no es necesario mover el meteorito aquí, lo hace la clase base con el delta time
         
         # Controlar el parpadeo
         if self.blink_counter > 0:
@@ -131,8 +127,7 @@ class Meteor(GameObject):
         """
         if event_type == "game_over":
             # Detener el movimiento
-            self.speed_x = 0
-            self.speed_y = 0
+            self.set_velocity(0, 0)
             return True
             
         return False

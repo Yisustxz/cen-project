@@ -1,52 +1,54 @@
-"""Representa la nave del jugador."""
+"""
+Clase Player - Representa al jugador controlado por el usuario.
+"""
 import pygame
-import math
 from motor.sprite import GameObject
-from space_shooter.core.constants import PLAYER_LIVES, MISSILE_COOLDOWN
+from space_shooter.core.constants import PLAYER_SPEED
 
 class Player(GameObject):
+    """Clase que representa al jugador en el juego Space Shooter."""
+    
     def __init__(self, x, y):
         # La imagen la asignaremos después, cuando esté disponible
-        super().__init__(x, y, obj_type="player")
+        super().__init__(x, y, None, "player")
         
-        self.lives = PLAYER_LIVES
+        # Atributos específicos del jugador
+        self.lives = 3
         self.score = 0
-        self.damage_image = None
-        self.invincibility_frames = 0
+        self.missile_cooldown = 200  # ms entre disparos
+        self.last_missile = 0
         
-        # Control de disparo de misiles
-        self.missile_cooldown = MISSILE_COOLDOWN
-        self.last_missile = pygame.time.get_ticks() - self.missile_cooldown
-    
+        # Para el sistema de daño e invencibilidad
+        self.damage_image = None  # Imagen con efecto de daño
+        self.invincibility_frames = 0  # Contador de frames de invencibilidad
+        
     def set_images(self, image, damage_image):
-        """Establece las imágenes para el jugador."""
+        """
+        Establece las imágenes del jugador.
+        
+        Args:
+            image: Imagen principal de la nave
+            damage_image: Imagen con efecto de daño
+        """
         self.image = image
         self.original_image = image
         self.damage_image = damage_image
         
-        # Actualizar el rect
+        # Actualizar rect y hitbox
         self.rect = self.image.get_rect()
         self.rect.x = self.x
         self.rect.y = self.y
-        
-        # Crear una hitbox más pequeña para una colisión más precisa
-        # Usar el nuevo método de la clase base
-        self.create_hitbox(padding=-10)  # Mayor reducción para mejor visibilidad en modo debug
-        
-        # Ajustar la posición vertical de la hitbox para el jugador
-        self.hitbox.bottom = self.rect.bottom - 2
+        self.create_hitbox(padding=-10)  # Hitbox un poco más pequeña que la nave
     
     def on_update(self):
         """
         Lógica específica de actualización del jugador.
         Este método es llamado automáticamente por la clase base GameObject.
         """
-        # Ajuste específico para la hitbox del jugador (alineación inferior)
-        if self.has_hitbox:
-            self.hitbox.centerx = self.rect.centerx
-            self.hitbox.bottom = self.rect.bottom - 2
+        # Ya no es necesario mover al jugador aquí basado en velocidad, 
+        # lo hace la clase base GameObject
         
-        # Efecto de parpadeo durante invencibilidad
+        # Manejar invencibilidad
         if self.invincibility_frames > 0:
             # Parpadear cada 8 frames
             if self.invincibility_frames % 8 == 0:
@@ -100,6 +102,8 @@ class Player(GameObject):
         if event_type == "game_over":
             # Mostrar animación de game over
             self.set_visibility(True)  # Asegurar que sea visible en game over
+            # Detener movimiento
+            self.set_velocity(0, 0)
             return True
         elif event_type == "meteor_destroyed":
             # Reaccionar a la destrucción de un meteorito
@@ -129,18 +133,22 @@ class Player(GameObject):
         
         action_performed = False
         
-        # Calcular velocidad actual
-        current_speed = PLAYER_SPEED
+        # Usar directamente PLAYER_SPEED que ya está en píxeles por segundo
+        speed = PLAYER_SPEED
         
-        # Mover nave hacia la izquierda
+        # Mover nave a la izquierda
         if keys[K_LEFT] and self.rect.left > 0:
-            self.x -= current_speed
+            self.set_velocity(-speed, 0)
             action_performed = True
             
-        # Mover nave hacia la derecha
+        # Mover nave a la derecha
         elif keys[K_RIGHT] and self.rect.right < GAME_WIDTH:
-            self.x += current_speed
+            self.set_velocity(speed, 0)
             action_performed = True
+            
+        # Detener cuando se sueltan las teclas
+        else:
+            self.set_velocity(0, 0)
             
         # Disparar misil
         if keys[K_SPACE]:
@@ -155,7 +163,7 @@ class Player(GameObject):
                     })
                     self.last_missile = current_time
                     action_performed = True
-        
+            
         return action_performed
     
     def add_lives(self, lives):

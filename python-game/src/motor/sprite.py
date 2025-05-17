@@ -1,6 +1,14 @@
 """Clases base para sprites y objetos del juego."""
 import pygame
 import math
+import sys
+import os
+
+# Añadir el directorio src al path para poder importar
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Importar la utilidad de delta time
+from space_shooter.utils.delta_time import DeltaTime
 
 class GameObject(pygame.sprite.Sprite):
     """Clase base para todos los objetos del juego con hitbox personalizada."""
@@ -19,6 +27,10 @@ class GameObject(pygame.sprite.Sprite):
         
         self.x = x
         self.y = y
+        
+        # Vectores de velocidad para movimiento independiente de FPS
+        self.speed_x = 0
+        self.speed_y = 0
         
         # Tipo de objeto (para clasificación y manejo)
         self.type = obj_type or self.__class__.__name__
@@ -94,6 +106,26 @@ class GameObject(pygame.sprite.Sprite):
         self.angle = angle
         self.rotation_speed = speed
     
+    def set_velocity(self, speed_x, speed_y):
+        """
+        Establece la velocidad del objeto en ambos ejes.
+        
+        Args:
+            speed_x: Velocidad en el eje X (pixels por segundo)
+            speed_y: Velocidad en el eje Y (pixels por segundo)
+        """
+        self.speed_x = speed_x
+        self.speed_y = speed_y
+    
+    def get_velocity(self):
+        """
+        Obtiene la velocidad actual del objeto.
+        
+        Returns:
+            tuple: (speed_x, speed_y) Velocidad en ambos ejes
+        """
+        return (self.speed_x, self.speed_y)
+    
     def create_hitbox(self, scale=None, padding=None):
         """
         Crea o actualiza la hitbox basada en la imagen actual.
@@ -150,13 +182,21 @@ class GameObject(pygame.sprite.Sprite):
         Sigue el patrón Hollywood: actualiza primero lo común y luego llama al 
         método específico de la clase derivada.
         """
+        # Aplicar velocidad usando delta time para movimiento independiente de FPS
+        delta = DeltaTime.get_delta()
+        if self.speed_x != 0:
+            self.x += self.speed_x * delta
+        if self.speed_y != 0:
+            self.y += self.speed_y * delta
+        
         # Actualizar posición básica
-        self.rect.x = self.x
-        self.rect.y = self.y
+        self.rect.x = int(self.x)  # Convertir a entero para evitar problemas de precisión
+        self.rect.y = int(self.y)
         
         # Actualizar rotación si hay velocidad de rotación
         if self.rotation_speed != 0:
-            self.angle += self.rotation_speed
+            # Aplicar rotación usando delta time
+            self.angle += self.rotation_speed * delta
             self.angle %= 360
             self.update_rotation()
         
@@ -248,34 +288,55 @@ class GameObject(pygame.sprite.Sprite):
                 else:
                     color = (255, 255, 0, 128)  # Amarillo para otros objetos
             
-            # Crear una superficie con canal alpha
+            # Crear una superficie semitransparente
             hitbox_surface = pygame.Surface((self.hitbox.width, self.hitbox.height), pygame.SRCALPHA)
-            # Llenar con color semitransparente
             hitbox_surface.fill(color)
-            # Dibujar en la superficie principal
+            
+            # Dibujar en la superficie del juego
             surface.blit(hitbox_surface, self.hitbox)
-            
-            # Dibujar también el borde para mayor visibilidad (usando el mismo color pero sólido)
-            border_color = (color[0], color[1], color[2])  # Quitar canal alpha para el borde
-            pygame.draw.rect(surface, border_color, self.hitbox, 1)
-            
-            # Mostrar tamaño de la hitbox
-            font = pygame.font.Font(None, 14)  # Fuente pequeña
-            size_text = f"{self.hitbox.width}x{self.hitbox.height}"
-            text_surf = font.render(size_text, True, (255, 255, 255))
-            # Colocar el texto en la esquina superior izquierda de la hitbox
-            surface.blit(text_surf, (self.hitbox.left, self.hitbox.top - 15))
     
-    def on_game_event(self, event_type, data=None):
+    def emit_event(self, event_type, data=None):
         """
-        Método para recibir eventos del juego.
+        Emite un evento al juego si tiene referencia al mismo.
         
         Args:
             event_type: Tipo de evento
             data: Datos asociados al evento (opcional)
+            
+        Returns:
+            bool: True si se pudo emitir el evento, False en caso contrario
+        """
+        if self.game and hasattr(self.game, 'emit_event'):
+            self.game.emit_event(event_type, data)
+            return True
+        return False
+    
+    def play_sound(self, sound_name):
+        """
+        Reproduce un sonido usando el gestor de recursos del juego.
         
+        Args:
+            sound_name: Nombre del sonido
+            
+        Returns:
+            bool: True si se pudo reproducir el sonido, False en caso contrario
+        """
+        if self.game and hasattr(self.game, 'resource_manager'):
+            if self.game.resource_manager.play_sound(sound_name):
+                return True
+        return False
+    
+    def on_game_event(self, event_type, data=None):
+        """
+        Maneja eventos emitidos por el juego.
+        Este método debe ser sobrescrito por clases derivadas para
+        implementar el manejo específico de eventos.
+        
+        Args:
+            event_type: Tipo de evento
+            data: Datos asociados al evento (opcional)
+            
         Returns:
             bool: True si el evento fue manejado, False en caso contrario
         """
-        # Por defecto no maneja ningún evento
-        return False 
+        return False  # Por defecto no maneja ningún evento 

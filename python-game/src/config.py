@@ -70,7 +70,8 @@ class Config:
                 "display": {
                     "width": 800,
                     "height": 600,
-                    "fullscreen": False
+                    "fullscreen": False,
+                    "fpsLimit": 60
                 }
             }
         }
@@ -206,6 +207,16 @@ class Config:
             bool: True si se debe usar pantalla completa, False en caso contrario.
         """
         return cls.get("frontend", "display", "fullscreen", default=False)
+        
+    @classmethod
+    def get_fps_limit(cls):
+        """
+        Obtiene el límite de FPS configurado.
+        
+        Returns:
+            int: Límite de FPS (fotogramas por segundo).
+        """
+        return cls.get("frontend", "display", "fpsLimit", default=60)
 
 # Inicializar la configuración al importar el módulo
 Config.load_config() 

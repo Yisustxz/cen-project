@@ -25,11 +25,11 @@ TRANS_BLUE = (0, 0, 200, 128)
 PLAYER_START_X = GAME_WIDTH // 2
 PLAYER_START_Y = GAME_HEIGHT - 50
 PLAYER_LIVES = 3
-PLAYER_SPEED = 2
+PLAYER_SPEED = 300  # Píxeles por segundo (antes era 2 por frame)
 
 # Configuración de misiles
 MISSILE_COOLDOWN = 200
-MISSILE_SPEED = 5
+MISSILE_SPEED = 600  # Píxeles por segundo (antes era 5 por frame)
 
 # FPS del juego
 FPS = 120

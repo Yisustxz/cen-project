@@ -1,21 +1,19 @@
 """
-Clase Missile - Representa los misiles disparados por el jugador.
+Clase Missile - Representa los proyectiles disparados por el jugador.
 """
 import pygame
-from pygame.locals import *
 from motor.sprite import GameObject
-from space_shooter.core.constants import WHITE, MISSILE_SPEED
+from space_shooter.core.constants import MISSILE_SPEED, WHITE
 
 class Missile(GameObject):
-    """Representa los misiles disparados por el jugador."""
-
+    """Clase que representa los misiles disparados por el jugador."""
+    
     def __init__(self, x, y):
         # Inicializar primero sin imagen, pero con tipo "missile"
-        super().__init__(x, y, obj_type="missile")
-
-        # Crear una superficie personalizada para el misil
-        self.image = pygame.Surface((4, 8), pygame.SRCALPHA)
-        self.image.fill((0, 0, 0, 0))  # Transparente
+        super().__init__(x, y, None, obj_type="missile")
+        
+        # Crear una simple imagen blanca para el misil
+        self.image = pygame.Surface((2, 6))
         self.original_image = self.image
 
         # Dibujar el misil como píxeles blancos
@@ -27,6 +25,9 @@ class Missile(GameObject):
         self.rect = self.image.get_rect()
         self.rect.x = x - self.rect.width // 2
         self.rect.y = y
+
+        # Establecer velocidad usando MISSILE_SPEED que ya está en píxeles por segundo
+        self.set_velocity(0, -MISSILE_SPEED)
 
         # Crear una hitbox más grande para facilitar impactos
         # Usar las nuevas funcionalidades de escala
@@ -45,8 +46,7 @@ class Missile(GameObject):
         Lógica específica de actualización del misil.
         Este método es llamado automáticamente por la clase base GameObject.
         """
-        # El misil sube por la pantalla
-        self.y -= MISSILE_SPEED
+        # Ya no es necesario mover el misil, lo hace la clase base con delta time
         
         # Verificar si el misil sigue en pantalla
         if self.rect.bottom <= 0:
