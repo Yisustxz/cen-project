@@ -4,6 +4,7 @@ Clase Player - Representa al jugador controlado por el usuario.
 import pygame
 from motor.sprite import GameObject
 from space_shooter.core.constants import PLAYER_SPEED
+from config import Config
 
 class Player(GameObject):
     """Clase que representa al jugador en el juego Space Shooter."""
@@ -129,12 +130,14 @@ class Player(GameObject):
             bool: True si se realizó alguna acción, False en caso contrario
         """
         from pygame.locals import K_LEFT, K_RIGHT, K_SPACE
-        from space_shooter.core.constants import GAME_WIDTH, PLAYER_SPEED
         
         action_performed = False
         
         # Usar directamente PLAYER_SPEED que ya está en píxeles por segundo
         speed = PLAYER_SPEED
+        
+        # Obtener el ancho del nivel para limitar el movimiento
+        level_width = Config.get_level_width()
         
         # Mover nave a la izquierda
         if keys[K_LEFT] and self.rect.left > 0:
@@ -142,7 +145,7 @@ class Player(GameObject):
             action_performed = True
             
         # Mover nave a la derecha
-        elif keys[K_RIGHT] and self.rect.right < GAME_WIDTH:
+        elif keys[K_RIGHT] and self.rect.right < level_width:
             self.set_velocity(speed, 0)
             action_performed = True
             

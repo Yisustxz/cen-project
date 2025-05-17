@@ -1,103 +1,75 @@
-"""Gestor de objetos para el motor de juego."""
+"""
+Gestor de objetos del motor del juego.
+"""
 
 class ObjectsManager:
     """
-    Gestiona el registro y mantenimiento de los objetos del juego.
-    Permite clasificar objetos por tipo y obtener referencias a ellos.
+    Clase para gestionar los objetos del juego.
+    
+    Esta clase gestiona el registro, actualización y colisiones de los objetos del juego.
     """
     
-    def __init__(self, game=None):
+    def __init__(self, game):
         """
         Inicializa el gestor de objetos.
         
         Args:
-            game: Referencia opcional al juego principal
+            game: Referencia al motor del juego
         """
-        # Lista principal de todos los objetos registrados
-        self.objects = []
-        
-        # Diccionario para acceder a objetos por tipo
-        self.objects_by_type = {}
-        
-        # Referencia al juego principal (opcional)
         self.game = game
+        self.objects = []
     
-    def register(self, game_object):
+    def register_object(self, obj):
         """
-        Registra un objeto para actualización y renderizado automáticos.
+        Registra un nuevo objeto en el gestor.
         
         Args:
-            game_object: Objeto derivado de GameObject
+            obj: Objeto a registrar
             
         Returns:
-            bool: True si el objeto fue registrado, False si ya estaba registrado
+            bool: True si se registró correctamente, False en caso contrario
         """
-        if game_object not in self.objects:
-            # Agregar a la lista principal
-            self.objects.append(game_object)
-            
-            # Clasificar por tipo si está disponible
-            if hasattr(game_object, 'type'):
-                obj_type = game_object.type
-                if obj_type not in self.objects_by_type:
-                    self.objects_by_type[obj_type] = []
-                self.objects_by_type[obj_type].append(game_object)
-            
-            # Inyectar referencia al juego si está disponible
-            if self.game and hasattr(game_object, 'set_game'):
-                game_object.set_game(self.game)
+        if obj not in self.objects:
+            # Vincular el objeto al juego
+            if hasattr(obj, 'set_game'):
+                obj.set_game(self.game)
                 
+            # Añadir a la lista principal
+            self.objects.append(obj)
             return True
         return False
     
-    def unregister(self, game_object):
+    def unregister_object(self, obj):
         """
-        Elimina un objeto del registro automático.
+        Elimina un objeto del gestor.
         
         Args:
-            game_object: Objeto derivado de GameObject
+            obj: Objeto a eliminar
             
         Returns:
-            bool: True si el objeto fue eliminado, False si no estaba registrado
+            bool: True si se eliminó correctamente, False en caso contrario
         """
-        if game_object in self.objects:
-            # Eliminar de la lista principal
-            self.objects.remove(game_object)
-            
-            # Eliminar de la clasificación por tipo
-            if hasattr(game_object, 'type') and game_object.type in self.objects_by_type:
-                if game_object in self.objects_by_type[game_object.type]:
-                    self.objects_by_type[game_object.type].remove(game_object)
-                
-                # Eliminar la lista si está vacía
-                if not self.objects_by_type[game_object.type]:
-                    del self.objects_by_type[game_object.type]
-            
+        if obj in self.objects:
+            self.objects.remove(obj)
             return True
         return False
     
-    def register_objects(self, objects_list):
-        """
-        Registra una lista de objetos.
-        
-        Args:
-            objects_list: Lista de objetos derivados de GameObject
-        """
-        for obj in objects_list:
-            self.register(obj)
-    
-    def clear(self):
+    def clear_objects(self):
         """Elimina todos los objetos registrados."""
         self.objects.clear()
-        self.objects_by_type.clear()
     
     def get_objects(self):
-        """Devuelve la lista completa de objetos registrados."""
-        return self.objects
+        """
+        Obtiene todos los objetos registrados.
+        
+        Returns:
+            list: Lista de objetos registrados
+        """
+        return self.objects[:]  # Devolver una copia para evitar modificaciones durante iteración
     
     def get_objects_by_type(self, obj_type):
         """
-        Devuelve la lista de objetos de un tipo específico.
+        Obtiene objetos de un tipo específico.
         
         Args:
             obj_type: Tipo de objeto a filtrar
@@ -105,21 +77,63 @@ class ObjectsManager:
         Returns:
             list: Lista de objetos del tipo especificado
         """
-        return self.objects_by_type.get(obj_type, [])
+        return [obj for obj in self.objects if hasattr(obj, 'type') and obj.type == obj_type]
     
-    def set_game(self, game):
+    def count_objects_by_type(self, obj_type):
         """
-        Establece la referencia al juego principal.
+        Cuenta objetos de un tipo específico.
         
         Args:
-            game: Referencia al juego principal
+            obj_type: Tipo de objeto a contar
+            
+        Returns:
+            int: Número de objetos del tipo especificado
         """
-        self.game = game
+        return len(self.get_objects_by_type(obj_type))
+    
+    def update_objects(self):
+        """Actualiza todos los objetos registrados."""
+        # Usar una copia para evitar errores si se añaden/eliminan objetos durante la actualización
+        for obj in self.get_objects():
+            if hasattr(obj, 'update') and callable(obj.update):
+                obj.update()
+    
+    def draw_objects(self, surface):
+        """
+        Dibuja todos los objetos registrados en la superficie proporcionada.
         
-        # Actualizar la referencia en los objetos existentes
+        Args:
+            surface: Superficie de pygame donde dibujar
+        """
         for obj in self.objects:
-            if hasattr(obj, 'set_game'):
-                obj.set_game(game)
+            if hasattr(obj, 'draw') and callable(obj.draw):
+                obj.draw(surface)
+    
+    def draw_hitboxes(self, surface):
+        """
+        Dibuja las hitboxes de todos los objetos en modo depuración.
+        
+        Args:
+            surface: Superficie de pygame donde dibujar
+        """
+        for obj in self.objects:
+            if hasattr(obj, 'draw_hitbox') and callable(obj.draw_hitbox):
+                obj.draw_hitbox(surface)
+    
+    def detect_collisions(self):
+        """Detecta colisiones entre objetos que tienen hitbox."""
+        # Obtener objetos con hitbox
+        objects = [obj for obj in self.objects if hasattr(obj, 'has_hitbox') and obj.has_hitbox]
+        
+        # Comprobar colisiones entre cada par de objetos
+        for i, obj1 in enumerate(objects):
+            for obj2 in objects[i+1:]:
+                if obj1.collides_with(obj2):
+                    # Notificar colisión a ambos objetos
+                    if hasattr(obj1, 'on_collide') and callable(obj1.on_collide):
+                        obj1.on_collide(obj2)
+                    if hasattr(obj2, 'on_collide') and callable(obj2.on_collide):
+                        obj2.on_collide(obj1)
     
     def print_debug_info(self):
         """Imprime información de depuración sobre los objetos registrados."""
@@ -158,41 +172,6 @@ class ObjectsManager:
                     print(f"  - {obj.__class__.__name__}: {hitbox_status}")
         
         print("==============================\n")
-    
-    def detect_collisions(self):
-        """
-        Detecta colisiones entre todos los objetos registrados y llama a sus métodos on_collide.
-        Este método debe ser llamado durante la actualización del juego.
-        """
-        # Obtener una copia de los objetos para evitar problemas si se modifica la lista durante el proceso
-        objects = list(self.objects)
-        
-        # Verificar colisiones entre todos los objetos
-        for i, obj1 in enumerate(objects):
-            # Saltear objetos que no tienen hitbox o no son visibles
-            if not hasattr(obj1, 'has_hitbox') or not obj1.has_hitbox or not obj1.is_visible:
-                continue
-                
-            # Comprobar colisiones con otros objetos
-            for obj2 in objects[i+1:]:  # Empezar desde i+1 para no comprobar colisiones ya verificadas
-                # Saltear objetos que no tienen hitbox o no son visibles
-                if not hasattr(obj2, 'has_hitbox') or not obj2.has_hitbox or not obj2.is_visible:
-                    continue
-                
-                # Verificar colisión
-                if obj1.collides_with(obj2):
-                    # Llamar a los métodos on_collide de ambos objetos si están disponibles
-                    collision_handled = False
-                    
-                    if hasattr(obj1, 'on_collide') and callable(obj1.on_collide):
-                        collision_handled |= obj1.on_collide(obj2)
-                    
-                    if hasattr(obj2, 'on_collide') and callable(obj2.on_collide):
-                        collision_handled |= obj2.on_collide(obj1)
-                    
-                    # Si la colisión fue manejada, podemos interrumpir el bucle para este objeto
-                    if collision_handled:
-                        break
     
     def emit_event(self, event_type, data=None, target_type=None):
         """
@@ -258,18 +237,6 @@ class ObjectsManager:
                         nearest = obj
         
         return nearest
-    
-    def count_objects_by_type(self, obj_type):
-        """
-        Cuenta el número de objetos de un tipo específico.
-        
-        Args:
-            obj_type: Tipo de objeto a contar
-            
-        Returns:
-            int: Número de objetos del tipo especificado
-        """
-        return len(self.get_objects_by_type(obj_type))
     
     def filter_objects(self, filter_func):
         """

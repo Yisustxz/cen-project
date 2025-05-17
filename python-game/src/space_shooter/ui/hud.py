@@ -1,6 +1,7 @@
 """Sistema HUD (Heads-Up Display) para el juego."""
 import pygame
-from space_shooter.core.constants import GAME_WIDTH, GAME_HEIGHT, WHITE, RED, GREEN
+from space_shooter.core.constants import WHITE, RED, GREEN
+from config import Config
 
 class HUD:
     """Clase para gestionar el HUD del juego."""
@@ -17,24 +18,39 @@ class HUD:
         self.small_font = pygame.font.Font(pygame.font.get_default_font(), 12)
         self.big_font = pygame.font.Font(pygame.font.get_default_font(), 24)
         
-    def render(self, surface, player, debug_mode=False):
+        # Obtener las dimensiones del juego y del nivel
+        self.screen_width = Config.get_screen_width()
+        self.screen_height = Config.get_screen_height()
+        self.level_width = Config.get_level_width()
+        self.level_height = Config.get_level_height()
+        
+        # Calcular factor de escala entre el nivel y la pantalla
+        self.scale_x = self.screen_width / self.level_width
+        self.scale_y = self.screen_height / self.level_height
+        
+    def render(self, game_window, level_surface, player, debug_mode=False):
         """
         Renderiza todo el HUD.
         
         Args:
-            surface: Superficie donde dibujar
+            game_window: Ventana principal del juego donde dibujar
+            level_surface: Superficie del nivel (ya renderizada)
             player: Objeto del jugador
             debug_mode: Si está activo el modo debug
         """
+        # Escalar la superficie del nivel a la ventana real
+        scaled_surface = pygame.transform.scale(level_surface, (self.screen_width, self.screen_height))
+        game_window.blit(scaled_surface, (0, 0))
+        
         # Mostrar vidas con iconos
-        self.render_lives(surface, player.lives)
+        self.render_lives(game_window, player.lives)
         
         # Mostrar puntuación
-        self.render_score(surface, player.score)
+        self.render_score(game_window, player.score)
         
         # En modo debug, mostrar información adicional
         if debug_mode:
-            self.render_debug_info(surface)
+            self.render_debug_info(game_window)
             
     def render_lives(self, surface, lives):
         """
@@ -66,13 +82,13 @@ class HUD:
         # Crear un fondo semitransparente para la puntuación
         score_bg = pygame.Surface((150, 30), pygame.SRCALPHA)
         score_bg.fill((0, 0, 0, 128))  # Negro semitransparente
-        surface.blit(score_bg, (GAME_WIDTH - 160, 15))
+        surface.blit(score_bg, (self.screen_width - 160, 15))
         
         # Texto formateado para la puntuación
         score_text = f"SCORE: {score:,}"
         text_surface = self.font.render(score_text, True, WHITE)
         text_rect = text_surface.get_rect()
-        text_rect.right = GAME_WIDTH - 20
+        text_rect.right = self.screen_width - 20
         text_rect.top = 20
         surface.blit(text_surface, text_rect)
     
@@ -91,7 +107,7 @@ class HUD:
         # Crear un panel semitransparente con información
         debug_bg = pygame.Surface((180, 100), pygame.SRCALPHA)
         debug_bg.fill((30, 30, 30, 200))  # Gris oscuro semitransparente
-        surface.blit(debug_bg, (GAME_WIDTH - 190, GAME_HEIGHT - 110))
+        surface.blit(debug_bg, (self.screen_width - 190, self.screen_height - 110))
         
         # Información de depuración
         debug_texts = [
@@ -105,7 +121,7 @@ class HUD:
         # Renderizar textos
         for i, text in enumerate(debug_texts):
             text_surface = self.small_font.render(text, True, GREEN)
-            surface.blit(text_surface, (GAME_WIDTH - 180, GAME_HEIGHT - 100 + (i * 18)))
+            surface.blit(text_surface, (self.screen_width - 180, self.screen_height - 100 + (i * 18)))
             
     def render_game_over(self, surface):
         """
@@ -115,7 +131,7 @@ class HUD:
             surface: Superficie donde dibujar
         """
         # Fondo semitransparente
-        overlay = pygame.Surface((GAME_WIDTH, GAME_HEIGHT), pygame.SRCALPHA)
+        overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))  # Negro semitransparente
         surface.blit(overlay, (0, 0))
         
@@ -123,12 +139,12 @@ class HUD:
         gameover_text = "GAME OVER"
         text_surface = self.big_font.render(gameover_text, True, RED)
         text_rect = text_surface.get_rect()
-        text_rect.center = (GAME_WIDTH // 2, GAME_HEIGHT // 2 - 20)
+        text_rect.center = (self.screen_width // 2, self.screen_height // 2 - 20)
         surface.blit(text_surface, text_rect)
         
         # Mensaje para continuar
         continue_text = "Press Y to play again or N to quit"
         text_surface = self.font.render(continue_text, True, WHITE)
         text_rect = text_surface.get_rect()
-        text_rect.center = (GAME_WIDTH // 2, GAME_HEIGHT // 2 + 20)
+        text_rect.center = (self.screen_width // 2, self.screen_height // 2 + 20)
         surface.blit(text_surface, text_rect) 

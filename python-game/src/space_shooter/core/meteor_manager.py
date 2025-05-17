@@ -5,7 +5,8 @@ Encapsula toda la lógica relacionada con la creación y gestión de meteoritos.
 import random
 from space_shooter.entities.meteor import Meteor
 from space_shooter.data.meteor_data import MeteorData
-from space_shooter.core.constants import METEOR_SPAWN_FREQUENCY, GAME_WIDTH
+from space_shooter.core.constants import METEOR_SPAWN_FREQUENCY
+from config import Config
 
 class MeteorManager:
     """
@@ -132,7 +133,9 @@ class MeteorManager:
         """
         # Determinar posición si no se proporciona
         if position is None:
-            x = random.randint(0, GAME_WIDTH)
+            # Usar ancho del nivel en lugar del ancho del juego
+            level_width = Config.get_level_width()
+            x = random.randint(0, level_width)
             y = -100  # Inicio por encima de la pantalla
             position = (x, y)
         

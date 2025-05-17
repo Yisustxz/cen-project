@@ -72,6 +72,10 @@ class Config:
                     "height": 600,
                     "fullscreen": False,
                     "fpsLimit": 60
+                },
+                "level": {
+                    "width": 400,
+                    "height": 300
                 }
             }
         }
@@ -217,6 +221,38 @@ class Config:
             int: Límite de FPS (fotogramas por segundo).
         """
         return cls.get("frontend", "display", "fpsLimit", default=60)
+        
+    @classmethod
+    def get_level_width(cls):
+        """
+        Obtiene el ancho del área de juego lógica.
+        
+        Returns:
+            int: Ancho del nivel en píxeles.
+        """
+        return cls.get("frontend", "level", "width", default=400)
+        
+    @classmethod
+    def get_level_height(cls):
+        """
+        Obtiene el alto del área de juego lógica.
+        
+        Returns:
+            int: Alto del nivel en píxeles.
+        """
+        return cls.get("frontend", "level", "height", default=300)
+        
+    @classmethod
+    def get_level_aspect_ratio(cls):
+        """
+        Calcula la relación de aspecto del nivel.
+        
+        Returns:
+            float: Relación de aspecto (ancho/alto)
+        """
+        width = cls.get_level_width()
+        height = cls.get_level_height()
+        return width / height if height > 0 else 1.0
 
 # Inicializar la configuración al importar el módulo
 Config.load_config() 

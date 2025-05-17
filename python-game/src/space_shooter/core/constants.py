@@ -25,17 +25,17 @@ TRANS_BLUE = (0, 0, 200, 128)
 PLAYER_START_X = GAME_WIDTH // 2
 PLAYER_START_Y = GAME_HEIGHT - 50
 PLAYER_LIVES = 3
-PLAYER_SPEED = 300  # Píxeles por segundo (antes era 2 por frame)
+PLAYER_SPEED = 300  # Píxeles por segundo (valores originales)
 
 # Configuración de misiles
 MISSILE_COOLDOWN = 200
-MISSILE_SPEED = 600  # Píxeles por segundo (antes era 5 por frame)
+MISSILE_SPEED = 600  # Píxeles por segundo (valores originales)
 
 # FPS del juego
 FPS = 120
 
 # Frecuencia de generación de meteoros
-METEOR_SPAWN_FREQUENCY = 100
+METEOR_SPAWN_FREQUENCY = 100  # Menor valor = generación más frecuente
 
 # Nombre del juego
 GAME_TITLE = "Space Shooter" 
