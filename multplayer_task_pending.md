@@ -1,5 +1,16 @@
 # Plan de Implementación: Sistema Multijugador Space Shooter
 
+## Cambios Importantes en el Sistema de Hitbox
+
+**Nota:** El sistema de hitbox ha sido rediseñado con las siguientes modificaciones:
+
+1. Los hitboxes ahora están centrados en la posición (x, y) del objeto, lo que simplifica los cálculos de colisión.
+2. Los offsets (`offset_x` y `offset_y`) ya no afectan la posición del hitbox, sino que solo se utilizan para ajustar la posición del sprite al dibujar.
+3. El sistema garantiza que el centro del sprite y el centro del hitbox coincidan.
+4. Todos los cálculos de movimiento y colisión ahora utilizan directamente las propiedades del hitbox (left, right, etc.).
+
+Estos cambios se han reflejado en la implementación del servidor Go y en la integración del cliente Python. Las definiciones de protobuf mantienen los campos `offset_x` y `offset_y` pero ahora solo se utilizan para ajustar la posición de dibujo, no para el cálculo de colisiones.
+
 ## 1. Resumen
 
 Implementaremos un sistema multijugador para el juego Space Shooter que actualmente funciona en modo local. El servidor será desarrollado en Go y utilizará gRPC para la comunicación con los clientes Python. El sistema permitirá que múltiples jugadores se conecten a una sala de juego para jugar en modo cooperativo o competitivo.
@@ -197,8 +208,8 @@ message MissileInfo {
 message HitboxData {
   int32 width = 1;      // Ancho de la hitbox
   int32 height = 2;     // Alto de la hitbox
-  int32 offset_x = 3;   // Desplazamiento horizontal desde la posición del objeto
-  int32 offset_y = 4;   // Desplazamiento vertical desde la posición del objeto
+  int32 offset_x = 3;   // Offset para dibujar el sprite, no afecta la posición del hitbox
+  int32 offset_y = 4;   // Offset para dibujar el sprite, no afecta la posición del hitbox
 }
 
 // Estado completo del juego (para sincronización)
@@ -330,8 +341,8 @@ type GameObject struct {
 type HitboxData struct {
     Width    int
     Height   int
-    OffsetX  int
-    OffsetY  int
+    OffsetX  int // Offset para dibujar el sprite, no afecta la posición del hitbox
+    OffsetY  int // Offset para dibujar el sprite, no afecta la posición del hitbox
 }
 
 // Rect representa un rectángulo para colisiones
@@ -368,24 +379,17 @@ func (obj *GameObject) UpdateHitbox() {
         return
     }
 
-    // Calcular posición de la hitbox (posición directa + offset)
-    hitboxX := int(obj.X) + obj.HitboxData.OffsetX
-    hitboxY := int(obj.Y) + obj.HitboxData.OffsetY
-
-    // Crear o actualizar hitbox
+    // En el nuevo sistema, el hitbox se centra directamente en la posición del objeto
     if obj.Hitbox == nil {
         obj.Hitbox = &Rect{
-            X:      hitboxX,
-            Y:      hitboxY,
             Width:  obj.HitboxData.Width,
             Height: obj.HitboxData.Height,
         }
-    } else {
-        obj.Hitbox.X = hitboxX
-        obj.Hitbox.Y = hitboxY
-        obj.Hitbox.Width = obj.HitboxData.Width
-        obj.Hitbox.Height = obj.HitboxData.Height
     }
+
+    // Centrar el hitbox en la posición del objeto
+    obj.Hitbox.X = int(obj.X) - obj.HitboxData.Width/2
+    obj.Hitbox.Y = int(obj.Y) - obj.HitboxData.Height/2
 }
 
 // SetVelocity establece la velocidad del objeto
@@ -570,8 +574,8 @@ func (p *Player) MoveLeft(speed float64) {
     // Comprobar límites del nivel
     levelWidth := config.GetLevelWidth()
 
-    // Evitar que salga de la pantalla
-    if p.X + p.HitboxData.OffsetX > 0 {
+    // Evitar que salga de la pantalla - usar directamente la posición del hitbox
+    if p.Hitbox.X > 0 {
         p.SetVelocity(-speed, 0)
     } else {
         p.SetVelocity(0, 0)
@@ -583,8 +587,8 @@ func (p *Player) MoveRight(speed float64) {
     // Comprobar límites del nivel
     levelWidth := config.GetLevelWidth()
 
-    // Evitar que salga de la pantalla
-    if p.X + p.HitboxData.OffsetX + p.HitboxData.Width < float64(levelWidth) {
+    // Evitar que salga de la pantalla - usar directamente la posición del hitbox
+    if p.Hitbox.X + p.Hitbox.Width < float64(levelWidth) {
         p.SetVelocity(speed, 0)
     } else {
         p.SetVelocity(0, 0)
@@ -606,8 +610,9 @@ func (p *Player) FireMissile(currentTime float64) *Missile {
     // Actualizar tiempo del último disparo
     p.LastMissile = currentTime
 
-    // Calcular posición del misil
-    missileX := p.X + p.HitboxData.OffsetX
+    // En el nuevo sistema, el misil se crea en la posición central del jugador
+    // No se necesitan offsets adicionales
+    missileX := p.X
     missileY := p.Y
 
     // Crear misil
@@ -651,16 +656,16 @@ func NewMissile(playerID string, x, y float64) *Missile {
         Damage:     missileConfig.Damage,
     }
 
-    // Configurar hitbox desde la configuración
+    // Configurar hitbox
     hitboxData := &motor.HitboxData{
         Width:    missileConfig.HitboxWidth,
         Height:   missileConfig.HitboxHeight,
-        OffsetX:  missileConfig.OffsetX,
-        OffsetY:  missileConfig.OffsetY,
+        OffsetX:  missileConfig.OffsetX,  // Solo para dibujar el sprite, no afecta la posición del hitbox
+        OffsetY:  missileConfig.OffsetY,  // Solo para dibujar el sprite, no afecta la posición del hitbox
     }
     missile.SetHitboxData(hitboxData)
 
-    // Establecer velocidad vertical
+    // Configurar velocidad vertical (hacia arriba)
     missile.SetVelocity(0, -missileConfig.Speed)
 
     return missile
@@ -669,8 +674,15 @@ func NewMissile(playerID string, x, y float64) *Missile {
 // OnCollide maneja la colisión con otro objeto
 func (m *Missile) OnCollide(other *motor.GameObject) {
     if other.Type == "meteor" {
-        // El misil debe ser destruido
+        // Auto-destruir el misil
+        m.Destroy()
     }
+}
+
+// Destroy marca el misil para ser eliminado
+func (m *Missile) Destroy() {
+    // Marcar para eliminación
+    // El gestor de objetos se encargará de eliminarlo en la próxima actualización
 }
 ```
 
@@ -680,113 +692,264 @@ func (m *Missile) OnCollide(other *motor.GameObject) {
 
 ```python
 import grpc
-import spaceshooter_pb2
-import spaceshooter_pb2_grpc
 import threading
-import time
+import pygame
+from time import time
+from google.protobuf.json_format import MessageToDict
+from . import spaceshooter_pb2 as pb
+from . import spaceshooter_pb2_grpc as pb_grpc
 
 class NetworkingManager:
-    def __init__(self, game=None):
+    """Gestiona la comunicación con el servidor gRPC."""
+
+    def __init__(self, game):
         self.game = game
-        self.player_id = None
-        self.player_name = None
         self.channel = None
         self.stub = None
-        self.event_stream = None
+        self.stream_thread = None
         self.running = False
-        self.event_thread = None
+        self.player_id = None
+        self.player_name = "Player"  # Nombre por defecto
+        self.last_actions = {}  # Para evitar enviar acciones duplicadas
 
-    def connect(self, server_address, player_name):
-        """Conectar al servidor y unirse a una partida"""
+    def connect(self, server_address="localhost:50051"):
+        """Conecta al servidor gRPC."""
         try:
             # Crear canal gRPC
             self.channel = grpc.insecure_channel(server_address)
-            self.stub = spaceshooter_pb2_grpc.GameServiceStub(self.channel)
+            self.stub = pb_grpc.GameServiceStub(self.channel)
 
-            # Preparar solicitud de unión
-            self.player_name = player_name
-            request = spaceshooter_pb2.JoinRequest(player_name=player_name)
-
-            # Enviar solicitud y obtener stream de eventos
-            self.event_stream = self.stub.JoinGame(request)
-
-            # Iniciar hilo para procesar eventos
+            # Iniciar thread para recibir eventos
             self.running = True
-            self.event_thread = threading.Thread(target=self._process_events)
-            self.event_thread.daemon = True
-            self.event_thread.start()
+            self.stream_thread = threading.Thread(target=self._receive_events)
+            self.stream_thread.daemon = True
+            self.stream_thread.start()
 
             return True
         except Exception as e:
-            print(f"Error al conectar: {e}")
+            print(f"Error conectando al servidor: {e}")
             return False
 
     def disconnect(self):
-        """Desconectar del servidor"""
+        """Desconecta del servidor."""
         self.running = False
         if self.channel:
             self.channel.close()
 
-    def _process_events(self):
-        """Procesar eventos recibidos del servidor"""
+    def _receive_events(self):
+        """Recibe eventos del servidor (en un thread separado)."""
         try:
-            for event in self.event_stream:
+            # Unirse al juego
+            join_request = pb.JoinRequest(player_name=self.player_name)
+
+            # Iniciar stream de eventos del servidor
+            for event in self.stub.JoinGame(join_request):
                 if not self.running:
                     break
 
                 # Procesar evento según su tipo
-                if event.type == spaceshooter_pb2.PLAYER_JOINED:
-                    player_info = event.player_info
-                    if not self.player_id:
-                        self.player_id = player_info.player_id
-
-                    # Notificar al juego
-                    if self.game:
-                        self.game.on_player_joined(player_info)
-
-                elif event.type == spaceshooter_pb2.METEOR_CREATED:
-                    # Notificar al juego
-                    if self.game:
-                        self.game.on_meteor_created(event.meteor_info)
-
-                # ... procesar otros tipos de eventos ...
+                self._process_event(event)
 
         except Exception as e:
-            print(f"Error en el procesamiento de eventos: {e}")
-            if self.running and self.game:
-                self.game.on_connection_lost()
+            print(f"Error recibiendo eventos: {e}")
 
-    def send_player_action(self, action_type):
-        """Enviar acción del jugador al servidor"""
-        if not self.stub or not self.player_id:
+    def _process_event(self, event):
+        """Procesa un evento recibido del servidor."""
+        # Diferentes acciones según el tipo de evento
+        if event.type == pb.EventType.PLAYER_JOINED:
+            # Jugador se unió (podría ser este mismo jugador)
+            player_info = event.player_info
+
+            # Si es este jugador, guardar ID
+            if player_info.name == self.player_name and not self.player_id:
+                self.player_id = player_info.player_id
+
+            # Notificar al juego de un nuevo jugador
+            # El juego creará un objeto Player con los datos recibidos
+            self.game.emit_event("player_joined", {
+                "player_id": player_info.player_id,
+                "name": player_info.name,
+                "x": player_info.position_x,
+                "y": player_info.position_y,
+                "lives": player_info.lives,
+                "score": player_info.score,
+                "hitbox_data": {
+                    "width": player_info.hitbox_data.width,
+                    "height": player_info.hitbox_data.height,
+                    "offset_x": player_info.hitbox_data.offset_x,
+                    "offset_y": player_info.hitbox_data.offset_y
+                }
+            })
+
+        elif event.type == pb.EventType.PLAYER_LEFT:
+            # Jugador abandonó la partida
+            player_info = event.player_info
+            self.game.emit_event("player_left", {
+                "player_id": player_info.player_id
+            })
+
+        elif event.type == pb.EventType.METEOR_CREATED:
+            # Crear un nuevo meteorito
+            meteor_info = event.meteor_info
+            self.game.emit_event("create_meteor", {
+                "meteor_id": meteor_info.meteor_id,
+                "meteor_type": meteor_info.meteor_type,
+                "x": meteor_info.position_x,
+                "y": meteor_info.position_y,
+                "speed_x": meteor_info.speed_x,
+                "speed_y": meteor_info.speed_y,
+                "angle": meteor_info.angle,
+                "rotation_speed": meteor_info.rotation_speed,
+                "hitbox_data": {
+                    "width": meteor_info.hitbox_data.width,
+                    "height": meteor_info.hitbox_data.height,
+                    "offset_x": meteor_info.hitbox_data.offset_x,  # Solo para dibujar el sprite
+                    "offset_y": meteor_info.hitbox_data.offset_y   # Solo para dibujar el sprite
+                }
+            })
+
+        elif event.type == pb.EventType.METEOR_DESTROYED:
+            # Meteorito destruido
+            meteor_info = event.meteor_info
+            self.game.emit_event("meteor_destroyed", {
+                "meteor_id": meteor_info.meteor_id,
+                "x": meteor_info.position_x,
+                "y": meteor_info.position_y
+            })
+
+        elif event.type == pb.EventType.MISSILE_FIRED:
+            # Jugador disparó un misil
+            missile_info = event.missile_info
+            self.game.emit_event("create_missile", {
+                "missile_id": missile_info.missile_id,
+                "player_id": missile_info.player_id,
+                "x": missile_info.position_x,
+                "y": missile_info.position_y,
+                "hitbox_data": {
+                    "width": missile_info.hitbox_data.width,
+                    "height": missile_info.hitbox_data.height,
+                    "offset_x": missile_info.hitbox_data.offset_x,  # Solo para dibujar el sprite
+                    "offset_y": missile_info.hitbox_data.offset_y   # Solo para dibujar el sprite
+                }
+            })
+
+        elif event.type == pb.EventType.PLAYER_HIT:
+            # Jugador recibió daño
+            player_info = event.player_info
+            self.game.emit_event("player_hit", {
+                "player_id": player_info.player_id,
+                "lives": player_info.lives
+            })
+
+        elif event.type == pb.EventType.PLAYER_DIED:
+            # Jugador perdió todas sus vidas
+            player_info = event.player_info
+            self.game.emit_event("player_died", {
+                "player_id": player_info.player_id
+            })
+
+        elif event.type == pb.EventType.GAME_OVER:
+            # Fin del juego
+            self.game.emit_event("game_over", {})
+
+        elif event.type == pb.EventType.GAME_STATE:
+            # Estado completo del juego para sincronización
+            # Esto suele enviarse al conectar o cuando hay desincronización
+            game_state = event.game_state
+
+            # Procesar cada tipo de objeto
+            for player_info in game_state.players:
+                self.game.emit_event("sync_player", {
+                    "player_id": player_info.player_id,
+                    "name": player_info.name,
+                    "x": player_info.position_x,
+                    "y": player_info.position_y,
+                    "lives": player_info.lives,
+                    "score": player_info.score,
+                    "hitbox_data": {
+                        "width": player_info.hitbox_data.width,
+                        "height": player_info.hitbox_data.height,
+                        "offset_x": player_info.hitbox_data.offset_x,  # Solo para dibujar el sprite
+                        "offset_y": player_info.hitbox_data.offset_y   # Solo para dibujar el sprite
+                    }
+                })
+
+            for meteor_info in game_state.meteors:
+                self.game.emit_event("sync_meteor", {
+                    "meteor_id": meteor_info.meteor_id,
+                    "meteor_type": meteor_info.meteor_type,
+                    "x": meteor_info.position_x,
+                    "y": meteor_info.position_y,
+                    "speed_x": meteor_info.speed_x,
+                    "speed_y": meteor_info.speed_y,
+                    "angle": meteor_info.angle,
+                    "rotation_speed": meteor_info.rotation_speed,
+                    "hitbox_data": {
+                        "width": meteor_info.hitbox_data.width,
+                        "height": meteor_info.hitbox_data.height,
+                        "offset_x": meteor_info.hitbox_data.offset_x,  # Solo para dibujar el sprite
+                        "offset_y": meteor_info.hitbox_data.offset_y   # Solo para dibujar el sprite
+                    }
+                })
+
+            for missile_info in game_state.missiles:
+                self.game.emit_event("sync_missile", {
+                    "missile_id": missile_info.missile_id,
+                    "player_id": missile_info.player_id,
+                    "x": missile_info.position_x,
+                    "y": missile_info.position_y,
+                    "hitbox_data": {
+                        "width": missile_info.hitbox_data.width,
+                        "height": missile_info.hitbox_data.height,
+                        "offset_x": missile_info.hitbox_data.offset_x,  # Solo para dibujar el sprite
+                        "offset_y": missile_info.hitbox_data.offset_y   # Solo para dibujar el sprite
+                    }
+                })
+
+    def send_action(self, action_type):
+        """Envía una acción del jugador al servidor."""
+        if not self.player_id or not self.stub:
             return False
 
+        # Evitar enviar la misma acción repetidamente
+        current_time = time()
+        last_time = self.last_actions.get(action_type, 0)
+        if current_time - last_time < 0.05:  # No repetir acciones en menos de 50ms
+            return False
+
+        # Registrar tiempo de la acción
+        self.last_actions[action_type] = current_time
+
         try:
-            action = spaceshooter_pb2.PlayerAction(
+            # Crear mensaje de acción
+            action = pb.PlayerAction(
                 player_id=self.player_id,
                 action=action_type
             )
+
+            # Enviar acción al servidor
             response = self.stub.SendPlayerAction(action)
+
             return response.success
         except Exception as e:
-            print(f"Error al enviar acción: {e}")
+            print(f"Error enviando acción: {e}")
             return False
 
     def move_left(self):
-        """Mover jugador a la izquierda"""
-        return self.send_player_action(spaceshooter_pb2.PlayerAction.MOVE_LEFT)
+        """Envía acción de mover a la izquierda."""
+        return self.send_action(pb.PlayerAction.ActionType.MOVE_LEFT)
 
     def move_right(self):
-        """Mover jugador a la derecha"""
-        return self.send_player_action(spaceshooter_pb2.PlayerAction.MOVE_RIGHT)
+        """Envía acción de mover a la derecha."""
+        return self.send_action(pb.PlayerAction.ActionType.MOVE_RIGHT)
 
-    def stop_movement(self):
-        """Detener movimiento del jugador"""
-        return self.send_player_action(spaceshooter_pb2.PlayerAction.STOP)
+    def stop(self):
+        """Envía acción de detener."""
+        return self.send_action(pb.PlayerAction.ActionType.STOP)
 
-    def fire_missile(self):
-        """Disparar misil"""
-        return self.send_player_action(spaceshooter_pb2.PlayerAction.FIRE)
+    def fire(self):
+        """Envía acción de disparar."""
+        return self.send_action(pb.PlayerAction.ActionType.FIRE)
 ```
 
 ### 6.2 Modificaciones al SpaceShooterGame
@@ -810,11 +973,11 @@ class SpaceShooterGame:
 
             # Detener cuando se sueltan las teclas
             else:
-                self.networking.stop_movement()
+                self.networking.stop()
 
             # Disparar misil
             if keys[K_SPACE]:
-                self.networking.fire_missile()
+                self.networking.fire()
 
             return
 
@@ -1175,7 +1338,7 @@ func (s *Sprite) CollidesWith(other *Sprite) bool {
     return !(s.Hitbox.X > other.Hitbox.X + other.Hitbox.Width ||
              s.Hitbox.X + s.Hitbox.Width < other.Hitbox.X ||
              s.Hitbox.Y > other.Hitbox.Y + other.Hitbox.Height ||
-             s.Hitbox.Y + s.Hitbox.Height < other.Hitbox.Y)
+             s.Hitbox.Y + s.Hitbox.Height > other.Hitbox.Y)
 }
 
 // OnCollide maneja la colisión con otro sprite
@@ -1690,8 +1853,8 @@ func (s *GameServer) broadcastEvent(roomID string, event *pb.GameEvent) {
 
 1. **Adaptaciones del menú:**
 
-   - Eliminar opción "Crear"
-   - Modificar flujo para solo "Unirse"
+   - Eliminar opción "Crear partida"
+   - Modificar flujo para solo "Unirse a partida"
 
 2. **Networking:**
 

@@ -71,6 +71,10 @@ class GameObject(pygame.sprite.Sprite):
             self.image.fill((255, 255, 255))
             self.original_image = self.image
         
+        # Calcular y dibujar el centro de la imagen
+        self.image_center_x = int(self.x)
+        self.image_center_y = int(self.y)
+
         # Inicializar fuente para debug si es necesario
         if GameObject.debug_font is None:
             try:
@@ -78,6 +82,7 @@ class GameObject(pygame.sprite.Sprite):
                 GameObject.debug_font = pygame.font.SysFont("Arial", 14)
             except:
                 GameObject.debug_font = pygame.font.Font(None, 14)
+    
     
     def set_game(self, game):
         """
@@ -179,12 +184,10 @@ class GameObject(pygame.sprite.Sprite):
         offset_x = self.hitbox_data.get("offset_x", 0)
         offset_y = self.hitbox_data.get("offset_y", 0)
 
-        # Crear hitbox con posición basada en offset desde la posición del objeto
+        # Crear hitbox centrado en la posición del objeto
         self.hitbox = pygame.Rect(0, 0, width, height)
-        
-        # Centrar hitbox respecto a la posición del objeto
-        self.hitbox.centerx = self.x + offset_x
-        self.hitbox.centery = self.y + offset_y
+        self.hitbox.centerx = self.x
+        self.hitbox.centery = self.y
     
     def create_custom_hitbox(self, data):
         """
@@ -277,12 +280,26 @@ class GameObject(pygame.sprite.Sprite):
     def draw(self, surface):
         """
         Dibuja el objeto en la superficie proporcionada.
+        La posición del sprite se ajusta según los offsets.
         
         Args:
             surface: Superficie de pygame donde dibujar
         """
-        if self.is_visible:
-            surface.blit(self.image, (self.x, self.y))
+        if self.is_visible and self.image:
+            # Obtener offsets del hitbox_data
+            offset_x = self.hitbox_data.get("offset_x", 0) if self.hitbox_data else 0
+            offset_y = self.hitbox_data.get("offset_y", 0) if self.hitbox_data else 0
+            
+            self.image_center_x = self.x
+            self.image_center_y = self.y
+
+            # Calcular la posición de dibujo aplicando offsets negativos
+            # para que el sprite se posicione correctamente en relación al hitbox
+            rect = self.image.get_rect()
+            rect.centerx = self.image_center_x
+            rect.centery = self.image_center_y
+            
+            surface.blit(self.image, rect)
     
     def draw_hitbox(self, surface, color=None):
         """
@@ -330,24 +347,30 @@ class GameObject(pygame.sprite.Sprite):
             center_y = self.hitbox.centery
             pygame.draw.circle(surface, self.DEBUG_CENTER_COLOR, 
                                (center_x, center_y), self.DEBUG_CENTER_SIZE // 2)
-            
-            # Dibujar centro del sprite como punto negro
-            sprite_center_x = int(self.x)
-            sprite_center_y = int(self.y)
+
+                
             pygame.draw.circle(surface, self.DEBUG_SPRITE_CENTER_COLOR, 
-                               (sprite_center_x, sprite_center_y), self.DEBUG_CENTER_SIZE // 2)
+                               (self.image_center_x, self.image_center_y), self.DEBUG_CENTER_SIZE // 2)
             
             # Mostrar información específica para meteoritos
             if self.type == "meteor" and hasattr(self, 'meteor_type'):
                 if GameObject.debug_font:
+                    # Calcular posición para texto basada en posición del sprite
+                    if self.hitbox_data:
+                        text_x = self.x - self.hitbox_data.get("offset_x", 0)
+                        text_y = self.y - self.hitbox_data.get("offset_y", 0) - 20
+                    else:
+                        text_x = self.x
+                        text_y = self.y - 20
+                    
                     # Dibujar tipo de meteorito
                     type_text = GameObject.debug_font.render(self.meteor_type, True, (255, 255, 255))
-                    surface.blit(type_text, (self.x, self.y - 20))
+                    surface.blit(type_text, (text_x, text_y))
                     
                     # Dibujar HP restante si está disponible
                     if hasattr(self, 'hp'):
                         hp_text = GameObject.debug_font.render(f"HP: {self.hp}", True, (255, 255, 255))
-                        surface.blit(hp_text, (self.x, self.y - 10))
+                        surface.blit(hp_text, (text_x, text_y + 10))
     
     def emit_event(self, event_type, data=None):
         """

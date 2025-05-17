@@ -68,9 +68,16 @@ class Player(GameObject):
         """Dibuja el efecto de daño si el jugador ha sido golpeado."""
         # Dibujar daño si está activo
         if self.invincibility_frames > 0 and self.damage_image:
-            damage_x = self.x - self.damage_image.get_width() / 3
-            damage_y = self.y - self.damage_image.get_height() / 2
-            surface.blit(self.damage_image, (damage_x, damage_y))
+            # Obtener offsets del hitbox_data
+            offset_x = self.hitbox_data.get("offset_x", 0) if self.hitbox_data else 0
+            offset_y = self.hitbox_data.get("offset_y", 0) if self.hitbox_data else 0
+            
+            # Calcular posición ajustando offsets para que el sprite se coloque correctamente
+            rect = self.damage_image.get_rect()
+            rect.centerx = self.x - offset_x
+            rect.centery = self.y - offset_y
+            
+            surface.blit(self.damage_image, rect)
     
     def take_damage(self):
         """Aplica daño al jugador si no está en estado de invencibilidad."""
@@ -150,13 +157,13 @@ class Player(GameObject):
         # Obtener el ancho del nivel para limitar el movimiento
         level_width = Config.get_level_width()
         
-        # Mover nave a la izquierda
-        if keys[K_LEFT] and self.x + self.hitbox_data['offset_x']//2 > 0:
+        # Mover nave a la izquierda - Verificar que el hitbox no salga del límite izquierdo
+        if keys[K_LEFT] and self.hitbox.left > 0:
             self.set_velocity(-speed, 0)
             action_performed = True
             
-        # Mover nave a la derecha
-        elif keys[K_RIGHT] and self.x + self.hitbox_data['offset_x']//2 + self.hitbox_data['width'] < level_width:
+        # Mover nave a la derecha - Verificar que el hitbox no salga del límite derecho
+        elif keys[K_RIGHT] and self.hitbox.right < level_width:
             self.set_velocity(speed, 0)
             action_performed = True
             
@@ -170,10 +177,10 @@ class Player(GameObject):
             # Verificar cooldown
             if current_time - self.last_missile > self.missile_cooldown:
                 if self.game:
-                    # Emitir evento para crear un misil
-                    missile_x = self.x + self.hitbox_data["offset_x"]
+                    # Emitir evento para crear un misil en la posición del hitbox
+                    # El offset ya no afecta al hitbox, sino a la posición del sprite
                     self.game.emit_event("player_fire_missile", {
-                        "x": missile_x,
+                        "x": self.x,  # Usar la posición central del hitbox
                         "y": self.y
                     })
                     self.last_missile = current_time
