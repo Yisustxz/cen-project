@@ -53,6 +53,9 @@ class NetworkEventsManager:
         event = notification_event.event
         event_type = event.event_type
         
+        # Guardar el tipo de evento actual para referencia en los handlers
+        self._current_event_type = event_type
+        
         # Manejar diferentes tipos de eventos basados en el tipo y el campo específico
         if event_type == "player_connect" and hasattr(event, 'player_connect'):
             data = event.player_connect
@@ -69,6 +72,11 @@ class NetworkEventsManager:
         elif event_type == "meteor_destroyed" and hasattr(event, 'meteor_destroyed'):
             data = event.meteor_destroyed
             self._handle_meteor_destroyed(data)
+            
+        elif event_type == "missile_fired" and hasattr(event, 'meteor_destroyed'):
+            # Reutilizamos meteor_destroyed para misiles
+            data = event.meteor_destroyed
+            self._handle_meteor_destroyed(data)
         
         elif event_type == "score_update" and hasattr(event, 'score_update'):
             data = event.score_update
@@ -77,6 +85,9 @@ class NetworkEventsManager:
         # Si no tiene un campo específico, intentar usar campos genéricos
         else:
             print(f"Evento de tipo desconocido: {event_type}")
+            
+        # Limpiar la referencia al tipo de evento actual
+        self._current_event_type = None
     
     def _handle_player_connect(self, player_connect_data):
         """Maneja un evento de conexión de jugador."""
@@ -100,10 +111,22 @@ class NetworkEventsManager:
         })
     
     def _handle_meteor_destroyed(self, meteor_destroyed_data):
-        """Maneja un evento de meteorito destruido."""
-        if not hasattr(meteor_destroyed_data, 'meteor_id'):
+        """Maneja un evento de meteorito destruido o misil disparado."""
+        if not hasattr(meteor_destroyed_data, 'player_id'):
+            return
+        
+        # Verificar el tipo de evento real basado en el event_type padre
+        parent_event = getattr(self, '_current_event_type', None)
+        
+        # Si es un evento de misil disparado
+        if parent_event == "missile_fired":
+            self.game.emit_event("online_missile_fired", {
+                "player_id": meteor_destroyed_data.player_id,
+                "missile_id": meteor_destroyed_data.meteor_id
+            })
             return
             
+        # Si es un evento normal de meteorito destruido
         self.game.emit_event("online_meteor_destroyed", {
             "meteor_id": meteor_destroyed_data.meteor_id,
             "player_id": getattr(meteor_destroyed_data, 'player_id', 0)
@@ -190,30 +213,38 @@ class NetworkEventsManager:
         Notifica al servidor sobre un misil disparado.
         
         Args:
-            data: Datos del disparo
+            data: Datos del disparo con x, y, player_id
         """
         if not self.client or not self.client.connected:
             return
             
         try:
             # Verificar que tengamos los datos necesarios
-            if 'x' not in data or 'y' not in data:
+            if 'x' not in data or 'y' not in data or 'player_id' not in data:
                 return
             
-            # Usamos score_update como vehículo para el evento de misil
-            # ya que no hay un campo específico para misiles en GameEvent
-            score_update = game_pb2.ScoreUpdateEvent(
-                player_id=self.client.player_id,
-                score_delta=0  # No estamos actualizando el puntaje realmente
+            # Crear Vector2D para la posición del misil
+            position = game_pb2.Vector2D(
+                x=data['x'],
+                y=data['y']
             )
             
-            # Crear evento usando la estructura oneof correcta
+            # Crear evento de misil disparado usando MeteorDestroyedEvent como vehículo
+            # (reutilizamos otro tipo existente ya que no hay MissileFiredEvent)
+            missile_event = game_pb2.MeteorDestroyedEvent(
+                meteor_id=0,  # Usamos 0 como ID temporal
+                player_id=data['player_id']
+            )
+            
+            # Crear evento con tipo personalizado
             event = game_pb2.GameEvent(
-                event_type="missile_fired",  # Esto es solo el tipo
-                score_update=score_update  # Usar un campo que exista
+                event_type="missile_fired",
+                meteor_destroyed=missile_event
             )
             
             # Enviar el evento
             self.client.stub.SendEvent(event)
+            print(f"Enviado evento de misil disparado por jugador {data['player_id']}")
+            
         except Exception as e:
             print(f"Error al enviar evento de disparo de misil: {e}") 

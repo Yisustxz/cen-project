@@ -301,5 +301,13 @@ class Player(GameObject):
                 "x": self.x, 
                 "y": self.y - self.hitbox.height/2
             })
+            
+            # Notificar al servidor en modo multijugador
+            if self.player_id is not None and hasattr(self.game, 'network_events_manager') and self.game.network_events_manager:
+                self.game.network_events_manager.on_player_fired_missile({
+                    "x": self.x, 
+                    "y": self.y - self.hitbox.height/2,
+                    "player_id": self.player_id
+                })
         
         return missile

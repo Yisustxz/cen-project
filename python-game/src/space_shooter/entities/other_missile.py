@@ -76,8 +76,16 @@ class OtherMissile(GameObject):
             self.has_hit = True
             self.should_destroy = True
             
-            # No aplica daño real al meteorito, solo efecto visual
-            # El dueño original del misil enviará el evento de daño
+            # Si tiene acceso al juego, notificar la colisión visualmente
+            if self.game:
+                # Emitir evento visual para efectos (no altera estado del juego)
+                self.game.emit_event("missile_hit", {
+                    "x": self.x,
+                    "y": self.y,
+                    "is_remote": True,
+                    "player_id": self.player_id,
+                    "missile_id": self.id
+                })
             
             return True
         return False

@@ -415,3 +415,39 @@ class SpaceShooterGame(GameEngine):
             # Asignar ID
             if meteor:
                 meteor.set_network_id(data['meteor_id'])
+
+    def on_online_missile_fired(self, data):
+        """
+        Crea un misil basado en los datos del servidor.
+        
+        Args:
+            data: Datos del misil con player_id y missile_id
+        """
+        if 'player_id' in data:
+            from space_shooter.entities.other_missile import OtherMissile
+            
+            # Encontrar la posición del jugador remoto para crear el misil
+            remote_players = self.objects_manager.get_objects_by_type("other_player")
+            player_found = False
+            
+            for player in remote_players:
+                if player.player_id == data['player_id']:
+                    player_found = True
+                    # Crear el misil en la posición del jugador
+                    missile_id = data.get('missile_id', 0)
+                    
+                    # Crear misil justo encima del jugador
+                    missile = OtherMissile(
+                        player.x, 
+                        player.y - player.hitbox.height/2, 
+                        missile_id, 
+                        player.player_id
+                    )
+                    
+                    # Registrar el misil en el motor
+                    self.register_object(missile)
+                    print(f"Misil remoto creado para jugador {player.player_id}")
+                    break
+            
+            if not player_found:
+                print(f"Advertencia: No se encontró al jugador {data['player_id']} para crear su misil")
