@@ -500,4 +500,6 @@ class SpaceShooterGame(GameEngine):
                     return
             
             # Si llegamos aquí, no se encontró el meteorito
-            print(f"Advertencia: No se encontró el meteorito con ID {meteor_id} para destruir")
+            # Esto es normal, ya que el meteorito podría haber sido destruido localmente
+            # o aún no haber sido creado en este cliente
+            print(f"Meteorito {meteor_id} no encontrado - posiblemente ya destruido localmente")

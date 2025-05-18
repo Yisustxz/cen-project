@@ -310,7 +310,7 @@ func (s *GameServiceImpl) SendEvent(ctx context.Context, event *pb.GameEvent) (*
 	}
 
 	// En otros casos, simplemente reenviamos el evento a los demás clientes
-	if event.EventType != "meteor_destroyed" {
+	if event.EventType != "meteor_destroyed" && event.EventType != "missile_fired" {
 		s.BroadcastEvent(event)
 	}
 

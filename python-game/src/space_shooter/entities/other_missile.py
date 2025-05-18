@@ -8,7 +8,7 @@ from space_shooter.core.constants import WHITE
 
 class OtherMissile(GameObject):
     """Clase que representa los misiles disparados por otros jugadores."""
-    
+
     def __init__(self, x, y, missile_id, player_id):
         # Inicializar primero sin imagen, pero con tipo "other_missile"
         super().__init__(x, y, None, obj_type="other_missile")
@@ -57,6 +57,8 @@ class OtherMissile(GameObject):
         Lógica específica de actualización del misil.
         Este método es llamado automáticamente por la clase base GameObject.
         """
+        print(f"Misil actualizado: {self.id}")
+
         # Verificar si el misil sigue en pantalla
         if self.hitbox.bottom <= 0:
             self.should_destroy = True
@@ -72,23 +74,25 @@ class OtherMissile(GameObject):
         Maneja la colisión con otra entidad.
         IMPORTANTE: No causa daño real, solo visual.
         """
-        if other_entity.type == "meteor" and not self.has_hit:
-            self.has_hit = True
-            self.should_destroy = True
-            
-            # Si tiene acceso al juego, notificar la colisión visualmente
-            if self.game:
-                # Emitir evento visual para efectos (no altera estado del juego)
-                self.game.emit_event("missile_hit", {
-                    "x": self.x,
-                    "y": self.y,
-                    "is_remote": True,
-                    "player_id": self.player_id,
-                    "missile_id": self.id
-                })
-            
-            return True
-        return False
+        return True
+
+    def take_collide_with_meteor(self):
+        """
+        Maneja la colisión con un meteorito.
+        """
+        self.should_destroy = True
+        self.has_hit = True
+
+        self.game.unregister_object(self)
+        self.kill()  # Eliminar de todos los grupos de sprites
+
+        return True
+
+    def already_hit(self):
+        """
+        Obtiene el estado de colisión del misil.
+        """
+        return self.has_hit
 
     def get_damage(self):
         """
@@ -97,7 +101,7 @@ class OtherMissile(GameObject):
         Returns:
             int: Cantidad de daño que inflige el misil
         """
-        return 0  # No causa daño real
+        return 1  # No causa daño real
 
     def should_be_destroyed(self):
         """
@@ -111,7 +115,7 @@ class OtherMissile(GameObject):
     def on_game_event(self, event_type, data=None):
         """
         Maneja eventos emitidos por el juego.
-        
+
         Args:
             event_type: Tipo de evento
             data: Datos asociados al evento (opcional)
@@ -123,5 +127,5 @@ class OtherMissile(GameObject):
             # Auto-destruir el misil cuando termina el juego
             self.should_destroy = True
             return True
-            
-        return False 
+
+        return False

@@ -95,7 +95,7 @@ class Meteor(GameObject):
         self.hp -= damage
         
         # Parpadeo al recibir daño
-        self.blink_counter = 10
+        self.blink_counter = 5
         self.set_visibility(False)
         
         # Verificar si fue destruido
@@ -116,15 +116,50 @@ class Meteor(GameObject):
             self.kill()
             return True
         return False
-    
+
+    def take_other_player_damage(self, damage=1):
+        """
+        Aplica daño a un jugador remoto.
+
+        Args:
+            damage: Cantidad de daño a aplicar
+        """
+        # Parpadeo al recibir daño
+        self.hp -= damage
+        #console log de aplicaicon de daño
+        print(f"Aplica daño a un jugador remoto: {damage}")
+        # Verificar si fue destruido
+        if self.hp <= 0:
+            # No ganamos puntos, ya que es un meteorito remoto
+            
+            # Si tiene acceso al juego, notificar la destrucción
+            if self.game:
+                # No notificamos la destrucción, ya que es un meteorito remoto
+                self.game.unregister_object(self)
+
+            self.kill()
+            return True
+        return False
+
     def on_collide(self, other_entity):
         """Maneja la colisión con otra entidad."""
         if other_entity.type == "missile":
             # Obtener el daño desde el misil
-            missile_damage = other_entity.get_damage() if hasattr(other_entity, 'get_damage') else 1
+            missile_damage = other_entity.get_damage()
             return self.take_damage(missile_damage)
+        elif other_entity.type == "other_missile":
+            # Obtener el daño desde el jugador remoto
+            other_missile_damage = other_entity.get_damage()
+
+            # Verificar si el misil remoto tiene el método take_collide_with_meteor
+            if not other_entity.has_hit:
+                other_entity.has_hit = True
+                other_entity.take_collide_with_meteor()
+                return self.take_other_player_damage(other_missile_damage)
+            else:
+                return False
         return False
-    
+
     def get_points(self):
         """Devuelve los puntos ganados por destruir este meteorito."""
         return self.points_earned
