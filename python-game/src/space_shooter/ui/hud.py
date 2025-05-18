@@ -142,8 +142,17 @@ class HUD:
         text_rect.center = (self.screen_width // 2, self.screen_height // 2 - 20)
         surface.blit(text_surface, text_rect)
         
-        # Mensaje para continuar
-        continue_text = "Press Y to play again or N to quit"
+        # Verificar si estamos en modo multijugador usando la configuración
+        is_multiplayer = Config.get("frontend", "multiplayerMode", "enable")
+        
+        # Mensaje para continuar, diferente según el modo de juego
+        if is_multiplayer:
+            # En modo online, solo se puede salir
+            continue_text = "Press N to quit"
+        else:
+            # En modo offline, se puede reiniciar o salir
+            continue_text = "Press Y to play again or N to quit"
+            
         text_surface = self.font.render(continue_text, True, WHITE)
         text_rect = text_surface.get_rect()
         text_rect.center = (self.screen_width // 2, self.screen_height // 2 + 20)

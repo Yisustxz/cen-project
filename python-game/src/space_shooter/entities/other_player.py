@@ -38,7 +38,9 @@ class OtherPlayer(GameObject):
     def render_name(self):
         """Renderiza el nombre del jugador como una superficie."""
         if self.player_name:
-            self.name_surface = self.name_font.render(self.player_name, True, (255, 255, 255))
+            # Color negro para los jugadores remotos
+            text_color = (255, 255, 255)  # Blanco (mantener el color original)
+            self.name_surface = self.name_font.render(self.player_name, True, text_color)
         else:
             self.name_surface = None
         
@@ -90,11 +92,14 @@ class OtherPlayer(GameObject):
             name_rect.centerx = self.x
             name_rect.bottom = self.y - self.image.get_height() // 2 - 5  # 5 píxeles arriba de la nave
             
-            # Dibujar texto con un borde oscuro para legibilidad
-            pygame.draw.rect(surface, (0, 0, 0), 
-                            (name_rect.x - 2, name_rect.y - 2, 
-                             name_rect.width + 4, name_rect.height + 4), 
-                            border_radius=4)
+            # Crear un fondo negro semitransparente
+            bg_rect = name_rect.copy()
+            bg_rect.inflate_ip(4, 4)  # Hacer el fondo un poco más grande
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            bg_surface.fill((0, 0, 0, 180))  # Negro semitransparente
+            
+            # Dibujar el fondo y luego el texto
+            surface.blit(bg_surface, bg_rect)
             surface.blit(self.name_surface, name_rect)
     
     def draw_damage(self, surface):

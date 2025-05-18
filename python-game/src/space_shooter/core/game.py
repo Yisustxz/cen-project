@@ -158,7 +158,11 @@ class SpaceShooterGame(GameEngine):
     def on_handle_event(self, event):
         """Procesa eventos específicos del juego."""
         if self.gameover and event.type == pygame.KEYDOWN:
-            if event.key == K_y:
+            # Verificar si estamos en modo multijugador usando la configuración
+            is_multiplayer = Config.get("frontend", "multiplayerMode", "enable")
+            
+            if event.key == K_y and not is_multiplayer:
+                # Solo permitir reiniciar en modo offline
                 print("Reiniciando juego...")
                 self.restart_game()
             elif event.key == K_n:
