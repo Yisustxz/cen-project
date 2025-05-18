@@ -46,7 +46,7 @@ func (s *GameServiceImpl) StartGame() {
 			s.server.Logger.LogError("No se pudo configurar el sistema de meteoritos", 
 				fmt.Errorf("gestor de meteoritos no inicializado"))
 		}
-		
+
 		// Iniciar el motor de juego
 		s.game.Start()
 		
