@@ -7,6 +7,7 @@ import threading
 import sys
 from space_shooter.networking.generated import game_pb2, game_pb2_grpc
 from config import Config
+import time
 
 class NetworkClient:
     """Cliente para comunicación con el servidor de juego."""
@@ -109,10 +110,14 @@ class NetworkClient:
             self.player_id = response.player_id
             self.connected = True
             
+            print(f"Conectado exitosamente al servidor con ID: {self.player_id}")
+            
             # Iniciar hilo para eventos
             self._start_events_thread()
             
-            print(f"Conectado exitosamente al servidor con ID: {self.player_id}")
+            # Esperar un breve momento para que el servidor actualice su estado
+            time.sleep(0.5)
+
             return True
             
         except grpc.RpcError as e:
@@ -120,6 +125,8 @@ class NetworkClient:
             return False
         except Exception as e:
             print(f"Error inesperado durante la conexión: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def disconnect(self):
@@ -208,12 +215,18 @@ class NetworkClient:
     def request_game_state(self):
         """
         Solicita el estado actual del juego.
+        
+        Returns:
+            GameState: El estado del juego o None si hubo un error
         """
         if not self.connected or not self.stub:
+            print("Error: No se puede solicitar el estado del juego porque no hay conexión con el servidor")
             return None
             
         try:
-            # Crear solicitud usando el nuevo campo get_game_state
+            print(f"Solicitando estado del juego para el jugador {self.player_id}...")
+            
+            # Crear solicitud usando el campo get_game_state
             request = game_pb2.ClientRequest(
                 player_id=self.player_id,
                 get_game_state=True
@@ -225,12 +238,32 @@ class NetworkClient:
             # Obtener el primer resultado (o None si no hay)
             try:
                 game_state = next(response_iterator)
+                
+                # Verificar si el estado contiene jugadores
+                player_count = 0
+                if game_state and game_state.players and hasattr(game_state.players, 'players'):
+                    player_count = len(game_state.players.players)
+                    
+                print(f"Estado del juego recibido con {player_count} jugadores")
+                
+                # Imprimir información de cada jugador para depuración
+                if player_count > 0:
+                    print("Jugadores en el estado:")
+                    for player in game_state.players.players:
+                        print(f"  - ID: {player.player_id}, Nombre: {player.name}")
+                
                 return game_state
             except StopIteration:
+                print("Error: No se recibió respuesta del servidor al solicitar el estado del juego")
                 return None
                 
+        except grpc.RpcError as e:
+            print(f"Error RPC al solicitar estado del juego: {e.code()}: {e.details()}")
+            return None
         except Exception as e:
-            print(f"Error al solicitar estado del juego: {e}")
+            print(f"Error inesperado al solicitar estado del juego: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _start_events_thread(self):

@@ -96,10 +96,8 @@ class SpaceShooterGame(GameEngine):
             # Si estamos en modo multijugador, asignar el ID del jugador
             if self.network_client and self.network_client.connected:
                 player.set_network_ids(self.network_client.player_id)
-                
-                # Solicitar estado del juego (jugadores conectados)
-                print("Solicitando estado actual del juego...")
-                self.request_game_state()
+                # Ya no solicitamos el estado del juego aquí, lo hacemos en el momento de la conexión
+                print(f"Jugador configurado con ID de red: {self.network_client.player_id}")
             
             # Registrar el jugador en el motor
             self.register_object(player)
@@ -110,6 +108,10 @@ class SpaceShooterGame(GameEngine):
                 print("Creando meteorito inicial...")
                 self.meteor_manager.create_meteor()
                 
+            # Solicitar estado del juego (jugadores conectados)
+            print("Solicitando estado actual del juego...")
+            self.execute_request_game_state()
+
             print("Recursos del juego inicializados correctamente.")
         except Exception as e:
             print(f"Error al inicializar recursos: {e}")
@@ -117,7 +119,7 @@ class SpaceShooterGame(GameEngine):
             traceback.print_exc()
             self.quit()
 
-    def request_game_state(self):
+    def execute_request_game_state(self):
         """Solicita el estado actual del juego al servidor."""
         if not self.network_client or not self.network_client.connected:
             return
@@ -126,6 +128,11 @@ class SpaceShooterGame(GameEngine):
             # Solicitar estado al servidor
             game_state = self.network_client.request_game_state()
             
+            # Logs
+            print(f"Estado del juego recibido: {game_state}")
+            print(f"Jugadores recibidos: {game_state.players.players}")
+            print(f"Meteoros recibidos: {game_state.meteors.meteors}")
+
             if game_state and game_state.players and hasattr(game_state.players, 'players'):
                 # Procesar los jugadores conectados
                 for player_data in game_state.players.players:

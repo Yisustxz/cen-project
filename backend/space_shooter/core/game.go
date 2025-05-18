@@ -121,6 +121,26 @@ func (g *Game) UpdateGameState() {
 	g.gameServer.StateMutex.Lock()
 	defer g.gameServer.StateMutex.Unlock()
 	
+	// Crear la lista de jugadores activos
+	playersList := make([]*service.PlayerData, 0, len(g.gameServer.Players))
+	g.gameServer.PlayersMutex.RLock()
+	for _, player := range g.gameServer.Players {
+		if player.IsActive {
+			playerData := &service.PlayerData{
+				PlayerId:  player.ID,
+				Name:      player.Name,
+				Position:  player.Position,
+				VelocityX: 0,
+				Score:     player.Score,
+			}
+			playersList = append(playersList, playerData)
+		}
+	}
+	g.gameServer.PlayersMutex.RUnlock()
+	
+	// Actualizar la lista de jugadores en el estado del juego
+	g.gameServer.GameState.Players = &service.PlayerList{Players: playersList}
+	
 	// Actualizar la lista de meteoritos en el estado del juego
 	g.gameServer.GameState.Meteors = g.meteorManager.GetMeteorsProto()
 }
