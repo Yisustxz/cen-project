@@ -2,6 +2,7 @@
 Clase Player - Representa al jugador controlado por el usuario.
 """
 import pygame
+from pygame.locals import *
 from motor.sprite import GameObject
 from space_shooter.data.player_data import PlayerData
 from space_shooter.entities.missile import Missile
@@ -17,6 +18,7 @@ class Player(GameObject):
         # Identificadores para red - por defecto son None hasta que se conecte al servidor
         self.id = None             # ID único para el objeto (int32)
         self.player_id = None      # ID asignado por el servidor (int32)
+        self.player_name = "Player"  # Nombre del jugador por defecto
         
         # Cargar datos de configuración
         player_config = PlayerData.get_player_data()
@@ -36,6 +38,20 @@ class Player(GameObject):
         self.damage_image = None  # Imagen con efecto de daño
         self.invincibility_frames = 0  # Contador de frames de invencibilidad
         
+        # Para mostrar el nombre del jugador
+        self.name_font = pygame.font.Font(None, 20)  # Fuente pequeña
+        self.render_name()
+        
+        # Para controlar el evento STOP
+        self.at_border = False
+        
+    def render_name(self):
+        """Renderiza el nombre del jugador como una superficie."""
+        if self.player_name:
+            self.name_surface = self.name_font.render(self.player_name, True, (255, 255, 255))
+        else:
+            self.name_surface = None
+        
     def set_network_ids(self, player_id, object_id=None):
         """
         Establece los identificadores de red para este jugador.
@@ -46,7 +62,7 @@ class Player(GameObject):
         """
         self.player_id = player_id
         self.id = object_id if object_id is not None else player_id
-        
+    
     def set_images(self, image, damage_image):
         """
         Establece las imágenes del jugador.
@@ -67,9 +83,6 @@ class Player(GameObject):
         Lógica específica de actualización del jugador.
         Este método es llamado automáticamente por la clase base GameObject.
         """
-        # Ya no es necesario mover al jugador aquí basado en velocidad, 
-        # lo hace la clase base GameObject
-        
         # Manejar invencibilidad
         if self.invincibility_frames > 0:
             # Parpadear cada 8 frames
@@ -79,6 +92,37 @@ class Player(GameObject):
         elif not self.is_visible:
             # Asegurar que sea visible cuando termine la invencibilidad
             self.set_visibility(True)
+        
+        # Notificar cambio de posición al servidor si está en modo multijugador
+        if self.player_id is not None:
+            game = self.get_game()
+            if game and game.network_events_manager:
+                game.network_events_manager.on_player_position_changed(self)
+    
+    def draw(self, surface):
+        """
+        Dibuja el jugador en la superficie dada.
+        Sobrescribe el método draw de GameObject para añadir el nombre.
+        
+        Args:
+            surface: Superficie donde dibujar
+        """
+        # Llamar al método de dibujo de la clase base
+        super().draw(surface)
+        
+        # Dibujar el nombre sobre el jugador
+        if self.is_visible and self.name_surface:
+            # Calcular posición del nombre (centrado sobre el jugador)
+            name_rect = self.name_surface.get_rect()
+            name_rect.centerx = self.x
+            name_rect.bottom = self.y - self.image.get_height() // 2 - 5  # 5 píxeles arriba de la nave
+            
+            # Dibujar texto con un borde oscuro para legibilidad
+            pygame.draw.rect(surface, (0, 0, 0), 
+                            (name_rect.x - 2, name_rect.y - 2, 
+                             name_rect.width + 4, name_rect.height + 4), 
+                            border_radius=4)
+            surface.blit(self.name_surface, name_rect)
     
     def draw_damage(self, surface):
         """Dibuja el efecto de daño si el jugador ha sido golpeado."""
@@ -152,14 +196,14 @@ class Player(GameObject):
             return True
         
         return False
-
+    
     def handle_input(self, keys):
         """
         Maneja las entradas de teclado para el movimiento y disparo.
         
         Args:
             keys: Estado actual de las teclas
-        
+            
         Returns:
             bool: True si se realizó alguna acción, False en caso contrario
         """
@@ -173,20 +217,44 @@ class Player(GameObject):
         # Obtener el ancho del nivel para limitar el movimiento
         level_width = Config.get_level_width()
         
+        # Caso especial: detectar colisión con los bordes
+        at_border_now = False
+        
         # Mover nave a la izquierda - Verificar que el hitbox no salga del límite izquierdo
         if keys[K_LEFT] and self.hitbox.left > 0:
             self.set_velocity(-speed, 0)
             action_performed = True
+        elif keys[K_LEFT] and self.hitbox.left <= 0:
+            # Detener en el borde izquierdo
+            self.set_velocity(0, 0)
+            at_border_now = True
             
         # Mover nave a la derecha - Verificar que el hitbox no salga del límite derecho
         elif keys[K_RIGHT] and self.hitbox.right < level_width:
             self.set_velocity(speed, 0)
             action_performed = True
+        elif keys[K_RIGHT] and self.hitbox.right >= level_width:
+            # Detener en el borde derecho
+            self.set_velocity(0, 0)
+            at_border_now = True
             
         # Detener cuando se sueltan las teclas
         else:
             self.set_velocity(0, 0)
             
+        # Verificar si ha cambiado el estado de colisión con el borde
+        if at_border_now != self.at_border:
+            self.at_border = at_border_now
+            
+            # Si está en modo multijugador, notificar al servidor que el jugador se detuvo en el borde
+            if at_border_now and self.player_id is not None:
+                game = self.get_game()
+                if game and hasattr(game, 'network_events_manager') and game.network_events_manager:
+                    # Forzar actualización de posición con velocidad 0
+                    self.speed_x = 0
+                    self.speed_y = 0
+                    game.network_events_manager.on_player_position_changed(self, force_stop=True)
+        
         # Disparar misil
         if keys[K_SPACE]:
             # Usar el nuevo método fire_missile
@@ -194,10 +262,10 @@ class Player(GameObject):
             if missile and self.game:
                 # Registrar el misil con el juego
                 self.game.register_object(missile)
-                action_performed = True
-            
+            action_performed = True
+        
         return action_performed
-    
+        
     def add_lives(self, lives):
         """
         Añade vidas al jugador.
@@ -207,7 +275,7 @@ class Player(GameObject):
         """
         self.lives += lives
         print(f"Jugador obtuvo {lives} vida(s) extra")
-
+        
     def fire_missile(self):
         """
         Crea un nuevo misil en la posición del jugador.
@@ -217,7 +285,7 @@ class Player(GameObject):
         current_time = pygame.time.get_ticks()
         if current_time - self.last_missile < self.missile_cooldown:
             return None  # No ha pasado suficiente tiempo
-        
+            
         # Actualizar tiempo del último disparo
         self.last_missile = current_time
         
@@ -230,7 +298,7 @@ class Player(GameObject):
         if self.game:
             self.game.emit_event("missile_fired", {
                 "player_id": self.player_id,
-                "x": self.x,
+                "x": self.x, 
                 "y": self.y - self.hitbox.height/2
             })
         

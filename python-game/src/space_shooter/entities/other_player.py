@@ -31,6 +31,17 @@ class OtherPlayer(GameObject):
         self.damage_image = None  # Imagen con efecto de daño
         self.invincibility_frames = 0  # Contador de frames de invencibilidad
         
+        # Para mostrar el nombre del jugador
+        self.name_font = pygame.font.Font(None, 20)  # Fuente pequeña
+        self.render_name()
+    
+    def render_name(self):
+        """Renderiza el nombre del jugador como una superficie."""
+        if self.player_name:
+            self.name_surface = self.name_font.render(self.player_name, True, (255, 255, 255))
+        else:
+            self.name_surface = None
+        
     def set_images(self, image, damage_image):
         """
         Establece las imágenes del jugador.
@@ -60,6 +71,31 @@ class OtherPlayer(GameObject):
         elif not self.is_visible:
             # Asegurar que sea visible cuando termine la invencibilidad
             self.set_visibility(True)
+    
+    def draw(self, surface):
+        """
+        Dibuja el jugador en la superficie dada.
+        Sobrescribe el método draw de GameObject para añadir el nombre.
+        
+        Args:
+            surface: Superficie donde dibujar
+        """
+        # Llamar al método de dibujo de la clase base
+        super().draw(surface)
+        
+        # Dibujar el nombre sobre el jugador
+        if self.is_visible and self.name_surface:
+            # Calcular posición del nombre (centrado sobre el jugador)
+            name_rect = self.name_surface.get_rect()
+            name_rect.centerx = self.x
+            name_rect.bottom = self.y - self.image.get_height() // 2 - 5  # 5 píxeles arriba de la nave
+            
+            # Dibujar texto con un borde oscuro para legibilidad
+            pygame.draw.rect(surface, (0, 0, 0), 
+                            (name_rect.x - 2, name_rect.y - 2, 
+                             name_rect.width + 4, name_rect.height + 4), 
+                            border_radius=4)
+            surface.blit(self.name_surface, name_rect)
     
     def draw_damage(self, surface):
         """Dibuja el efecto de daño si el jugador ha sido golpeado."""

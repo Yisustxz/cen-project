@@ -204,6 +204,28 @@ func (s *GameServiceImpl) SendEvent(ctx context.Context, event *pb.GameEvent) (*
 			playerID := playerDisconnect.PlayerDisconnect.PlayerId
 			s.handlePlayerDisconnect(playerID)
 		}
+	case "player_position":
+		if playerPosition, ok := event.GetEventData().(*pb.GameEvent_PlayerPosition); ok {
+			// Extraer datos de posición
+			playerID := playerPosition.PlayerPosition.PlayerId
+			position := playerPosition.PlayerPosition.Position
+			
+			// Actualizar la posición del jugador en el estado del juego
+			s.server.PlayersMutex.RLock()
+			player, exists := s.server.Players[playerID]
+			s.server.PlayersMutex.RUnlock()
+			
+			if exists && player.IsActive {
+				player.Position = position
+				s.server.Logger.LogMessage(
+					fmt.Sprintf("Posición actualizada para jugador %d: (%f, %f)", 
+						playerID, position.X, position.Y),
+				)
+				
+				// Actualizar el estado del juego
+				s.updateGameState()
+			}
+		}
 	}
 
 	// Notificar el evento a todos los clientes
@@ -263,20 +285,47 @@ func (s *GameServiceImpl) GetGameState(stream pb.GameService_GetGameStateServer)
 	// Canal para enviar actualizaciones del estado a los clientes
 	for {
 		// Recibir solicitud del cliente (heartbeat)
-		_, err := stream.Recv()
+		req, err := stream.Recv()
 		if err != nil {
 			s.server.Logger.LogError("Error recibiendo solicitud de estado", err)
 			return err
 		}
-
-		// Enviar el estado actual del juego
-		s.server.StateMutex.RLock()
-		gameState := s.server.GameState
-		s.server.StateMutex.RUnlock()
-
-		if err := stream.Send(gameState); err != nil {
-			s.server.Logger.LogError("Error enviando estado del juego", err)
-			return err
+		
+		// Verificar que sea una solicitud de estado válida
+		if req.GetGetGameState() {
+			s.server.Logger.LogMessage(
+				fmt.Sprintf("Solicitud de estado recibida del jugador %d", req.PlayerId),
+			)
+			
+			// Verificar que el jugador exista
+			s.server.PlayersMutex.RLock()
+			_, exists := s.server.Players[req.PlayerId]
+			s.server.PlayersMutex.RUnlock()
+			
+			if !exists {
+				s.server.Logger.LogMessage(
+					fmt.Sprintf("Jugador %d no encontrado al solicitar estado", req.PlayerId),
+				)
+				return fmt.Errorf("jugador %d no encontrado", req.PlayerId)
+			}
+			
+			// Asegurarse de que el estado del juego esté actualizado
+			s.updateGameState()
+			
+			// Enviar el estado actual del juego
+			s.server.StateMutex.RLock()
+			gameState := s.server.GameState
+			s.server.StateMutex.RUnlock()
+			
+			s.server.Logger.LogMessage(
+				fmt.Sprintf("Enviando estado del juego al jugador %d con %d jugadores activos", 
+					req.PlayerId, len(gameState.Players.Players)),
+			)
+			
+			if err := stream.Send(gameState); err != nil {
+				s.server.Logger.LogError("Error enviando estado del juego", err)
+				return err
+			}
 		}
 	}
 }

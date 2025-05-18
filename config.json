@@ -1,14 +1,16 @@
 {
   "frontend": {
     "singlePlayerMode": {
-      "enable": true,
+      "enable": false,
       "skipMenu": true
     },
     "multiplayerMode": {
-      "enable": false,
+      "enable": true,
       "skipMenu": false,
-      "ipAddress": "localhost",
-      "port": 9090
+      "server": {
+        "host": "localhost",
+        "port": 9090
+      }
     },
     "display": {
       "width": 800,

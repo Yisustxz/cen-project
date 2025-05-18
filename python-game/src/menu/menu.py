@@ -20,9 +20,8 @@ MENU_PADDING = 20
 OPTION_SPACING = 20
 
 class MenuOption(Enum):
-    CREATE_GAME = 0
-    JOIN_GAME = 1
-    EXIT = 2
+    JOIN_GAME = 0
+    EXIT = 1
 
 class MainMenu:
     """Clase que gestiona el menú principal del juego."""
@@ -47,8 +46,7 @@ class MainMenu:
         
         # Opciones del menú
         self.options = [
-            "Crear partida",
-            "Conectarse a partida", 
+            "Conectarse",
             "Salir"
         ]
         
@@ -78,10 +76,8 @@ class MainMenu:
             elif event.key == pygame.K_RETURN:
                 # Devolver la opción seleccionada
                 if self.selected_option == 0:
-                    return MenuOption.CREATE_GAME
-                elif self.selected_option == 1:
                     return MenuOption.JOIN_GAME
-                elif self.selected_option == 2:
+                elif self.selected_option == 1:
                     return MenuOption.EXIT
         
         return None

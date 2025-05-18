@@ -74,6 +74,13 @@ message PlayerDisconnectEvent {
   string player_name = 2;
 }
 
+// NUEVO: Evento de posición de jugador
+message PlayerPositionEvent {
+  int32 player_id = 1;
+  Vector2D position = 2;
+  Vector2D velocity = 3;
+}
+
 // Evento de meteorito destruido
 message MeteorDestroyedEvent {
   int32 meteor_id = 1;
@@ -94,6 +101,7 @@ message GameEvent {
     PlayerDisconnectEvent player_disconnect = 3;
     MeteorDestroyedEvent meteor_destroyed = 4;
     ScoreUpdateEvent score_update = 5;
+    PlayerPositionEvent player_position = 6; // Nuevo campo para posición
   }
 }
 
@@ -119,6 +127,10 @@ message ClientRequest {
     bool disconnect = 2;
     MeteorDestroyedEvent meteor_destroyed = 3;
     ScoreUpdateEvent score_update = 4;
+    
+    // Nuevos campos para solicitudes específicas
+    bool get_game_state = 5; // Para solicitar el estado del juego
+    PlayerPositionEvent player_position = 6; // Para enviar posición
   }
 }
 

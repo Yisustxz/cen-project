@@ -43,19 +43,30 @@ def main():
     # Mostrar el menú principal
     menu_result = run_menu(screen)
 
-    # Manejar la opción seleccionada
-    if menu_result == MenuOption.CREATE_GAME:
-        # Por ahora, iniciar juego en modo single player
-        game = SpaceShooterGame()
-        game.run()
-    elif menu_result == MenuOption.JOIN_GAME:
-        # Por ahora, también iniciar en modo single player
-        # Aquí iría la lógica para unirse a una partida
-        game = SpaceShooterGame()
-        game.run()
-    elif menu_result == MenuOption.EXIT:
+    try:
+        # Manejar la opción seleccionada
+        if menu_result == MenuOption.JOIN_GAME:
+            # Configurar modo multijugador
+            print("Iniciando modo multijugador...")
+            
+            # Activar modo multijugador sin valores por defecto
+            # Si no hay configuración, fallará explícitamente
+            config.Config.set(True, "frontend", "multiplayerMode", "enable")
+            
+            # Inicializar el juego
+            # La conexión al servidor se maneja dentro de SpaceShooterGame
+            game = SpaceShooterGame()
+            game.run()
+        elif menu_result == MenuOption.EXIT:
+            print("Saliendo del juego...")
+            pygame.quit()
+            sys.exit()
+    except Exception as e:
+        print(f"Error al iniciar el juego: {e}")
+        import traceback
+        traceback.print_exc()
         pygame.quit()
-        sys.exit()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

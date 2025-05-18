@@ -3,6 +3,7 @@ Gestor de meteoritos para el juego Space Shooter.
 Encapsula toda la lógica relacionada con la creación y gestión de meteoritos.
 """
 import random
+import pygame
 from space_shooter.entities.meteor import Meteor
 from space_shooter.data.meteor_data import MeteorData
 from space_shooter.core.constants import METEOR_SPAWN_FREQUENCY
@@ -54,6 +55,12 @@ class MeteorManager:
         Actualiza el gestor de meteoritos.
         Llamado en cada frame por SpaceShooterGame.
         """
+        # Verificar si estamos en modo multijugador - sin fallbacks
+        multipayer_enabled = Config.get("frontend", "multiplayerMode", "enable")
+        if multipayer_enabled:
+            # En modo multijugador, no generar meteoritos localmente
+            return
+        
         # Actualizar contador de creación
         self.spawn_timer += 1
         

@@ -2,6 +2,7 @@
 import pygame
 from pygame.locals import *
 import random
+import sys
 
 # Usar importaciones absolutas en lugar de relativas
 from motor.game_engine import GameEngine
@@ -19,6 +20,8 @@ from space_shooter.core.constants import (
     FPS, METEOR_SPAWN_FREQUENCY, GAME_TITLE
 )
 from config import Config
+from space_shooter.networking.events_manager import NetworkEventsManager
+from space_shooter.networking.client import NetworkClient
 
 class SpaceShooterGame(GameEngine):
     """Implementación específica del juego Space Shooter."""
@@ -47,6 +50,25 @@ class SpaceShooterGame(GameEngine):
         # Asegurarnos de que DeltaTime está inicializado
         DeltaTime.init()
         
+        # Inicializar componentes de red si el modo multijugador está habilitado
+        self.network_events_manager = None
+        self.network_client = None
+        
+        # Si está habilitado el modo multijugador, inicializar red
+        # Sin fallbacks - si la configuración no existe, fallará explícitamente
+        multipayer_enabled = Config.get("frontend", "multiplayerMode", "enable")
+        if multipayer_enabled:
+            print("Modo multijugador activado. Iniciando conexión con el servidor...")
+            self.network_events_manager = NetworkEventsManager(self)
+            self.network_client = NetworkClient(self.network_events_manager)
+            self.network_events_manager.set_client(self.network_client)
+            
+            # Intentar establecer conexión con el servidor
+            if not self.network_client.initialize():
+                print("Error al conectar con el servidor. El juego no puede iniciarse en modo multijugador.")
+                pygame.quit()
+                sys.exit()
+        
         print("SpaceShooterGame inicializado correctamente.")
 
     def init_game(self):
@@ -71,18 +93,60 @@ class SpaceShooterGame(GameEngine):
             player = Player(player_x, player_y)
             player.set_images(spaceship_img, damage_img)
             
+            # Si estamos en modo multijugador, asignar el ID del jugador
+            if self.network_client and self.network_client.connected:
+                player.set_network_ids(self.network_client.player_id)
+                
+                # Solicitar estado del juego (jugadores conectados)
+                print("Solicitando estado actual del juego...")
+                self.request_game_state()
+            
             # Registrar el jugador en el motor
             self.register_object(player)
 
-            # Crear el primer meteorito
-            print("Creando meteorito inicial...")
-            self.meteor_manager.create_meteor()
+            # Crear el primer meteorito si no estamos en modo multijugador
+            multipayer_enabled = Config.get("frontend", "multiplayerMode", "enable")
+            if not multipayer_enabled:
+                print("Creando meteorito inicial...")
+                self.meteor_manager.create_meteor()
+                
             print("Recursos del juego inicializados correctamente.")
         except Exception as e:
             print(f"Error al inicializar recursos: {e}")
             import traceback
             traceback.print_exc()
             self.quit()
+
+    def request_game_state(self):
+        """Solicita el estado actual del juego al servidor."""
+        if not self.network_client or not self.network_client.connected:
+            return
+            
+        try:
+            # Solicitar estado al servidor
+            game_state = self.network_client.request_game_state()
+            
+            if game_state and game_state.players and hasattr(game_state.players, 'players'):
+                # Procesar los jugadores conectados
+                for player_data in game_state.players.players:
+                    # Ignorar a nuestro propio jugador
+                    if player_data.player_id == self.network_client.player_id:
+                        continue
+                        
+                    # Crear evento de conexión para cada jugador existente
+                    self.on_online_player_connected({
+                        'player_id': player_data.player_id,
+                        'player_name': player_data.name,
+                        'x': player_data.position.x if player_data.position else 0,
+                        'y': player_data.position.y if player_data.position else 0
+                    })
+                    
+                print(f"Estado del juego recibido: {len(game_state.players.players)} jugadores conectados")
+            else:
+                print("Respuesta de estado de juego vacía o inválida")
+                
+        except Exception as e:
+            print(f"Error al procesar estado del juego: {e}")
 
     def on_handle_event(self, event):
         """Procesa eventos específicos del juego."""
@@ -245,7 +309,109 @@ class SpaceShooterGame(GameEngine):
     def cleanup(self):
         """Limpia recursos antes de cerrar."""
         print("Limpiando recursos...")
+        
+        # Desconectar del servidor si estamos en modo multijugador
+        if self.network_client and self.network_client.connected:
+            self.network_client.disconnect()
+        
         # Limpiar recursos del gestor
         self.clear_objects()
         self.resource_manager.clear()
-        print("Recursos limpiados correctamente.")
+        
+    # Métodos para manejo de eventos online
+    
+    def on_online_player_connected(self, data):
+        """
+        Maneja la conexión de un jugador remoto.
+        
+        Args:
+            data: Datos del jugador conectado
+        """
+        from space_shooter.entities.other_player import OtherPlayer
+        
+        if 'player_id' in data and 'x' in data and 'y' in data:
+            # Verificar si ya existe este jugador
+            remote_players = self.objects_manager.get_objects_by_type("other_player")
+            for player in remote_players:
+                if player.player_id == data['player_id']:
+                    print(f"Jugador {data['player_id']} ya está registrado")
+                    return
+            
+            # Crear objeto OtherPlayer
+            player = OtherPlayer(
+                data['x'], data['y'], 
+                data['player_id'], 
+                data.get('player_name', f"Player_{data['player_id']}")
+            )
+            
+            # IMPORTANTE: Asignar imágenes al jugador remoto
+            spaceship_img = self.resource_manager.get_image('spaceship')
+            damage_img = self.resource_manager.get_image('damage')
+            player.set_images(spaceship_img, damage_img)
+            
+            # Registrar en el motor
+            self.register_object(player)
+            
+            # Notificar UI
+            self.emit_event("message", {"text": f"Jugador {data.get('player_name')} se ha unido"})
+            print(f"Jugador remoto registrado: ID {data['player_id']}, Nombre {data.get('player_name')}")
+
+    def on_online_player_disconnected(self, data):
+        """
+        Maneja la desconexión de un jugador remoto.
+        
+        Args:
+            data: Datos del jugador desconectado
+        """
+        if 'player_id' in data:
+            # Buscar el jugador remoto
+            remote_players = self.objects_manager.get_objects_by_type("other_player")
+            
+            for player in remote_players:
+                if player.player_id == data['player_id']:
+                    # Eliminar del motor
+                    self.unregister_object(player)
+                    
+                    # Notificar UI
+                    self.emit_event("message", {
+                        "text": f"Jugador {player.player_name} se ha desconectado"
+                    })
+                    break
+
+    def on_online_player_position(self, data):
+        """
+        Actualiza la posición de un jugador remoto.
+        
+        Args:
+            data: Datos de posición
+        """
+        if 'player_id' in data and 'x' in data and 'y' in data:
+            # Buscar el jugador remoto
+            remote_players = self.objects_manager.get_objects_by_type("other_player")
+            
+            for player in remote_players:
+                if player.player_id == data['player_id']:
+                    # Actualizar posición
+                    player.update_position(
+                        data['x'], data['y'],
+                        data.get('speed_x', 0), data.get('speed_y', 0)
+                    )
+                    break
+
+    def on_online_meteor_created(self, data):
+        """
+        Crea un meteorito basado en datos del servidor.
+        
+        Args:
+            data: Datos del meteorito
+        """
+        if 'meteor_id' in data and 'type' in data and 'x' in data and 'y' in data:
+            # Delegar la creación al gestor de meteoritos
+            meteor = self.meteor_manager.create_meteor(
+                data['type'], 
+                (data['x'], data['y'])
+            )
+            
+            # Asignar ID
+            if meteor:
+                meteor.set_network_id(data['meteor_id'])
