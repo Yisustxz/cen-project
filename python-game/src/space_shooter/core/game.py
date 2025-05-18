@@ -403,18 +403,30 @@ class SpaceShooterGame(GameEngine):
         Crea un meteorito basado en datos del servidor.
         
         Args:
-            data: Datos del meteorito
+            data: Datos del meteorito con meteor_id, type, x, y, angle, rotation_speed, speed_x, speed_y
         """
         if 'meteor_id' in data and 'type' in data and 'x' in data and 'y' in data:
+            print(f"Recibido evento de meteorito creado: ID {data['meteor_id']}, Tipo {data['type']}")
+            
+            # Preparar datos de velocidad
+            speed = (data.get('speed_x', 0), data.get('speed_y', 0))
+            
             # Delegar la creación al gestor de meteoritos
             meteor = self.meteor_manager.create_meteor(
                 data['type'], 
-                (data['x'], data['y'])
+                (data['x'], data['y']),
+                (data.get('angle', 0), data.get('rotation_speed', 0)),
+                speed  # Pasar la velocidad
             )
             
             # Asignar ID
             if meteor:
                 meteor.set_network_id(data['meteor_id'])
+                print(f"Meteorito remoto creado con ID {data['meteor_id']}")
+            else:
+                print(f"Error: No se pudo crear el meteorito remoto con ID {data['meteor_id']}")
+        else:
+            print("Error: Datos incompletos para crear meteorito:", data)
 
     def on_online_missile_fired(self, data):
         """

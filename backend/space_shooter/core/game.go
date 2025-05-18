@@ -132,13 +132,16 @@ func (g *Game) BroadcastMeteorCreated(meteor *entities.Meteor) {
 	}
 	
 	// Crear evento para notificar a los clientes
-	// Verificar si existe MeteorCreatedEvent en el proto, si no, usar otro tipo
 	event := &service.GameEvent{
 		EventType: "meteor_created",
-		EventData: &service.GameEvent_MeteorDestroyed{ // Utilizar el existente
-			MeteorDestroyed: &service.MeteorDestroyedEvent{
-				MeteorId: meteor.GetID(),
-				PlayerId: 0, // 0 indica que es generado por el servidor
+		EventData: &service.GameEvent_MeteorCreated{ // Usar el tipo correcto
+			MeteorCreated: &service.MeteorCreatedEvent{
+				MeteorId:      meteor.GetID(),
+				MeteorType:    meteor.GetMeteorType(),
+				Position:      meteor.Position.ToProtoVector(),
+				Angle:         meteor.Rotation,
+				RotationSpeed: meteor.RotationSpeed,
+				Velocity:      meteor.Velocity.ToProtoVector(),
 			},
 		},
 	}

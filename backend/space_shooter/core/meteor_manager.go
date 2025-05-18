@@ -283,7 +283,7 @@ func (mm *MeteorManager) CreateMeteor() *entities.Meteor {
 	// Si no se especifica posición, generar una aleatoria
 	var x, y float32
 	x = rand.Float32() * levelWidth
-	y = -50 // Iniciar fuera de la pantalla, arriba
+	y = -20 // Iniciar fuera de la pantalla, arriba
 	
 	// Usar la configuración para establecer las propiedades del meteorito
 	meteor := entities.NewMeteorFromConfig(x, y, meteorType, meteorConfig)

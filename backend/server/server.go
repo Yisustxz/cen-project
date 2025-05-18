@@ -13,6 +13,12 @@ import (
 	"github.com/Yisustxz/cen-project/backend/space_shooter/core"
 )
 
+// Constantes de configuración
+const (
+	// Si es false, no se mostrarán mensajes de notificación enviada
+	SHOW_NOTIFICATION_LOGS = false
+)
+
 // GameServiceImpl implementa la lógica de negocio del servidor
 type GameServiceImpl struct {
 	pb.UnimplementedGameServiceServer
@@ -91,9 +97,13 @@ func (s *GameServiceImpl) BroadcastEvent(event *pb.GameEvent) {
 			} else {
 				// Actualizar tiempo de última actividad
 				player.EventStream.LastSeen = time.Now()
-				s.server.Logger.LogMessage(
-					fmt.Sprintf("Notificación enviada al jugador %d", playerID),
-				)
+				
+				// Solo mostrar mensaje si está habilitado
+				if SHOW_NOTIFICATION_LOGS {
+					s.server.Logger.LogMessage(
+						fmt.Sprintf("Notificación enviada al jugador %d", playerID),
+					)
+				}
 			}
 		}
 		player.StreamMutex.RUnlock()

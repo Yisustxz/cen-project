@@ -81,6 +81,10 @@ class NetworkEventsManager:
         elif event_type == "score_update" and hasattr(event, 'score_update'):
             data = event.score_update
             self._handle_score_update(data)
+            
+        elif event_type == "meteor_created" and hasattr(event, 'meteor_created'):
+            data = event.meteor_created
+            self._handle_meteor_created(data)
         
         # Si no tiene un campo específico, intentar usar campos genéricos
         else:
@@ -247,4 +251,32 @@ class NetworkEventsManager:
             print(f"Enviado evento de misil disparado por jugador {data['player_id']}")
             
         except Exception as e:
-            print(f"Error al enviar evento de disparo de misil: {e}") 
+            print(f"Error al enviar evento de disparo de misil: {e}")
+
+    def _handle_meteor_created(self, meteor_created_data):
+        """
+        Maneja un evento de creación de meteorito.
+        
+        Args:
+            meteor_created_data: Datos del meteorito creado
+        """
+        if not hasattr(meteor_created_data, 'meteor_id') or not hasattr(meteor_created_data, 'position'):
+            print("Error: Datos incompletos en evento meteor_created")
+            return
+            
+        # Extraer datos del meteorito
+        position = meteor_created_data.position
+        velocity = meteor_created_data.velocity if hasattr(meteor_created_data, 'velocity') else None
+        
+        # Emitir evento al juego con todos los datos necesarios
+        self.game.emit_event("online_meteor_created", {
+            "meteor_id": meteor_created_data.meteor_id,
+            "type": meteor_created_data.meteor_type,
+            "x": position.x if position else 0,
+            "y": position.y if position else 0,
+            "angle": getattr(meteor_created_data, 'angle', 0),
+            "rotation_speed": getattr(meteor_created_data, 'rotation_speed', 0),
+            "speed_x": velocity.x if velocity else 0,
+            "speed_y": velocity.y if velocity else 0
+        })
+        print(f"Meteorito remoto recibido: ID {meteor_created_data.meteor_id}, Tipo {meteor_created_data.meteor_type}") 

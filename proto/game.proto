@@ -94,6 +94,7 @@ message MeteorCreatedEvent {
   Vector2D position = 3;
   float angle = 4;
   float rotation_speed = 5;
+  Vector2D velocity = 6;
 }
 
 // Evento de actualización de puntuación

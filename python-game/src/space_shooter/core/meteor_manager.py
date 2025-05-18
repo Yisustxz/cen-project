@@ -80,13 +80,15 @@ class MeteorManager:
         self.spawn_frequency = METEOR_SPAWN_FREQUENCY
         self.difficulty_factor = 1.0
     
-    def create_meteor(self, meteor_type=None, position=None):
+    def create_meteor(self, meteor_type=None, position=None, rotation=None, speed=None):
         """
         Crea un meteorito y lo registra en el motor del juego.
         
         Args:
             meteor_type: Tipo específico de meteorito (opcional)
             position: Posición inicial del meteorito (opcional)
+            rotation: Tupla (angle, rotation_speed) para la rotación (opcional)
+            speed: Tupla (speed_x, speed_y) para la velocidad (opcional)
             
         Returns:
             Meteor: El meteorito creado, o None si hubo un error
@@ -104,7 +106,7 @@ class MeteorManager:
             meteor_img = MeteorData.load_meteor_image(self.resource_manager, meteor_type)
             
             # Determinar propiedades aleatorias del meteorito
-            meteor_properties = self._determine_meteor_properties(meteor_data, position)
+            meteor_properties = self._determine_meteor_properties(meteor_data, position, rotation, speed)
             
             # Crear el meteorito con la imagen, tipo, datos y propiedades
             meteor = Meteor(
@@ -127,13 +129,15 @@ class MeteorManager:
             traceback.print_exc()
             return None
     
-    def _determine_meteor_properties(self, meteor_data, position=None):
+    def _determine_meteor_properties(self, meteor_data, position=None, rotation=None, speed=None):
         """
         Determina todas las propiedades aleatorias para un meteorito.
         
         Args:
             meteor_data: Datos de configuración del tipo de meteorito
             position: Posición inicial opcional (x, y)
+            rotation: Tupla (angle, rotation_speed) para la rotación (opcional)
+            speed: Tupla (speed_x, speed_y) para la velocidad (opcional)
             
         Returns:
             dict: Diccionario con todas las propiedades aleatorias
@@ -146,18 +150,29 @@ class MeteorManager:
             y = -100  # Inicio por encima de la pantalla
             position = (x, y)
         
-        # Obtener rangos de velocidad desde la configuración del meteoro
-        speed_x_range = meteor_data.get("speed_x_range", (-1, 1))
-        speed_y_range = meteor_data.get("speed_y_range", (1, 3))
-        rotation_range = meteor_data.get("rotation_speed_range", (-3, 3))
+        # Usar velocidad proporcionada o generar una aleatoria
+        if speed is not None and len(speed) == 2:
+            speed_x, speed_y = speed
+        else:
+            # Obtener rangos de velocidad desde la configuración del meteoro
+            speed_x_range = meteor_data.get("speed_x_range", (-1, 1))
+            speed_y_range = meteor_data.get("speed_y_range", (1, 3))
+            
+            # Determinar velocidades aleatorias
+            speed_x = random.uniform(speed_x_range[0], speed_x_range[1])
+            speed_y = random.uniform(speed_y_range[0], speed_y_range[1])
         
-        # Determinar velocidades aleatorias
-        speed_x = random.uniform(speed_x_range[0], speed_x_range[1])
-        speed_y = random.uniform(speed_y_range[0], speed_y_range[1])
-        
-        # Determinar rotación aleatoria
-        angle = random.randint(0, 360)
-        rotation_speed = random.uniform(rotation_range[0], rotation_range[1])
+        # Usar rotación proporcionada o generar una aleatoria
+        if rotation is not None and len(rotation) == 2:
+            angle = rotation[0]
+            rotation_speed = rotation[1]
+        else:
+            # Obtener rango de rotación
+            rotation_range = meteor_data.get("rotation_speed_range", (-3, 3))
+            
+            # Determinar rotación aleatoria
+            angle = random.randint(0, 360)
+            rotation_speed = random.uniform(rotation_range[0], rotation_range[1])
         
         # Devolver todas las propiedades
         return {
