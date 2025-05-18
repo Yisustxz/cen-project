@@ -87,6 +87,15 @@ message MeteorDestroyedEvent {
   int32 player_id = 2;
 }
 
+// NUEVO: Evento de meteorito creado
+message MeteorCreatedEvent {
+  int32 meteor_id = 1;
+  string meteor_type = 2;
+  Vector2D position = 3;
+  float angle = 4;
+  float rotation_speed = 5;
+}
+
 // Evento de actualización de puntuación
 message ScoreUpdateEvent {
   int32 player_id = 1;
@@ -102,6 +111,7 @@ message GameEvent {
     MeteorDestroyedEvent meteor_destroyed = 4;
     ScoreUpdateEvent score_update = 5;
     PlayerPositionEvent player_position = 6; // Nuevo campo para posición
+    MeteorCreatedEvent meteor_created = 7; // Nuevo evento
   }
 }
 

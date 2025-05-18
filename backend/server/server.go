@@ -10,18 +10,69 @@ import (
 
 	"github.com/Yisustxz/cen-project/backend/types"
 	pb "github.com/Yisustxz/cen-project/backend/internal/service"
+	"github.com/Yisustxz/cen-project/backend/space_shooter/core"
 )
 
 // GameServiceImpl implementa la lógica de negocio del servidor
 type GameServiceImpl struct {
 	pb.UnimplementedGameServiceServer
-	server *types.GameServer
+	server     *types.GameServer
+	game       *core.Game
 }
 
 // NewGameServiceImpl crea una nueva instancia del servicio del juego
 func NewGameServiceImpl(server *types.GameServer) *GameServiceImpl {
-	return &GameServiceImpl{
+	impl := &GameServiceImpl{
 		server: server,
+	}
+	
+	// Crear el juego después de tener la implementación
+	gameService := &types.GameServiceForwarder{Impl: impl}
+	impl.game = core.NewGame(server, gameService)
+	
+	return impl
+}
+
+// StartGame inicia el juego (debe llamarse después de iniciar el servidor)
+func (s *GameServiceImpl) StartGame() {
+	if s.game != nil {
+		s.server.Logger.LogMessage("Preparando motor de juego y configurando sistema de meteoritos...")
+		
+		// Configurar el gestor de meteoritos
+		meteorManager := s.game.GetMeteorManager()
+		if meteorManager != nil {
+			// Configurar según las dimensiones del nivel
+			meteorManager.SetLevelDimensions(800, 600)
+			
+			// Configurar frecuencia de generación de meteoritos
+			meteorManager.SetSpawnFrequency(2 * time.Second)
+			
+			// Configurar el máximo de meteoritos
+			meteorManager.SetMaxMeteors(15)
+			
+			// Asegurarse de que esté habilitado
+			meteorManager.Enable()
+			
+			s.server.Logger.LogMessage("Sistema de meteoritos configurado correctamente")
+		} else {
+			s.server.Logger.LogError("No se pudo configurar el sistema de meteoritos", 
+				fmt.Errorf("gestor de meteoritos no inicializado"))
+		}
+		
+		// Iniciar el motor de juego
+		s.game.Start()
+		
+		s.server.Logger.LogMessage("¡Game loop iniciado correctamente! Generación de meteoritos activada.")
+	} else {
+		s.server.Logger.LogError("Error al iniciar el juego", fmt.Errorf("objeto game es nil"))
+	}
+}
+
+// StopGame detiene el juego
+func (s *GameServiceImpl) StopGame() {
+	if s.game != nil {
+		s.game.Stop()
+		s.server.Logger.LogMessage("Juego detenido")
 	}
 }
 
@@ -93,7 +144,7 @@ func (s *GameServiceImpl) Start(address string) error {
 
 	s.server.Logger.LogMessage(fmt.Sprintf("Servidor iniciado en %s", address))
 
-	// Iniciamos el servidor en una goroutine para no bloquear
+	// Iniciamos el servidor gRPC en una goroutine para no bloquear
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
 			s.server.Logger.LogError("Error en el servidor", err)
@@ -109,6 +160,9 @@ func (s *GameServiceImpl) Start(address string) error {
 			s.CleanupInactiveStreams()
 		}
 	}()
+	
+	// Iniciar el juego después de que el servidor esté preparado
+	s.StartGame()
 
 	return nil
 }
@@ -131,9 +185,6 @@ func (s *GameServiceImpl) Connect(ctx context.Context, req *pb.ConnectRequest) (
 	s.server.PlayersMutex.Unlock()
 
 	s.server.Logger.LogMessage(fmt.Sprintf("Jugador conectado: %s (ID: %d)", req.PlayerName, playerID))
-
-	// Actualizar el estado del juego
-	s.updateGameState()
 
 	// Notificar a todos los clientes conectados sobre el nuevo jugador
 	connectEvent := &pb.GameEvent{
@@ -217,19 +268,53 @@ func (s *GameServiceImpl) SendEvent(ctx context.Context, event *pb.GameEvent) (*
 			
 			if exists && player.IsActive {
 				player.Position = position
-				s.server.Logger.LogMessage(
-					fmt.Sprintf("Posición actualizada para jugador %d: (%f, %f)", 
-						playerID, position.X, position.Y),
-				)
 				
 				// Actualizar el estado del juego
 				s.updateGameState()
 			}
 		}
+	case "missile_fired":
+		// Manejamos los misiles disparados
+		if meteorDestroyed, ok := event.GetEventData().(*pb.GameEvent_MeteorDestroyed); ok {
+			// Este evento reutiliza el evento MeteorDestroyed
+			missileEvent := meteorDestroyed.MeteorDestroyed
+			playerID := missileEvent.PlayerId
+			
+			s.server.Logger.LogMessage(
+				fmt.Sprintf("Jugador %d disparó un misil", playerID),
+			)
+			
+			// Reenviamos el evento a todos los clientes
+			s.BroadcastEvent(event)
+		}
+	case "meteor_destroyed":
+		// Maneja la destrucción de meteoritos
+		if meteorDestroyed, ok := event.GetEventData().(*pb.GameEvent_MeteorDestroyed); ok {
+			meteorID := meteorDestroyed.MeteorDestroyed.MeteorId
+			playerID := meteorDestroyed.MeteorDestroyed.PlayerId
+			
+			s.server.Logger.LogMessage(
+				fmt.Sprintf("Meteorito %d destruido por jugador %d", meteorID, playerID),
+			)
+			
+			// Si el juego está activo, procesamos la destrucción
+			if s.game != nil {
+				// El juego se encargará de actualizar la puntuación
+				meteorManager := s.game.GetMeteorManager()
+				if meteorManager != nil {
+					meteorManager.DestroyMeteor(meteorID, playerID)
+				}
+			} else {
+				// Si no hay juego, solo reenviamos el evento
+				s.BroadcastEvent(event)
+			}
+		}
 	}
 
-	// Notificar el evento a todos los clientes
-	s.BroadcastEvent(event)
+	// En otros casos, simplemente reenviamos el evento a los demás clientes
+	if event.EventType != "meteor_destroyed" {
+		s.BroadcastEvent(event)
+	}
 
 	return &pb.ServerResponse{
 		Success:      true,
@@ -290,7 +375,7 @@ func (s *GameServiceImpl) GetGameState(stream pb.GameService_GetGameStateServer)
 			s.server.Logger.LogError("Error recibiendo solicitud de estado", err)
 			return err
 		}
-		
+
 		// Verificar que sea una solicitud de estado válida
 		if req.GetGetGameState() {
 			s.server.Logger.LogMessage(
@@ -308,18 +393,41 @@ func (s *GameServiceImpl) GetGameState(stream pb.GameService_GetGameStateServer)
 				)
 				return fmt.Errorf("jugador %d no encontrado", req.PlayerId)
 			}
-			
+
 			// Asegurarse de que el estado del juego esté actualizado
 			s.updateGameState()
-			
+
 			// Enviar el estado actual del juego
 			s.server.StateMutex.RLock()
 			gameState := s.server.GameState
 			s.server.StateMutex.RUnlock()
 			
+			// Validar que el estado del juego sea válido
+			if gameState == nil {
+				s.server.Logger.LogError("Estado del juego es nil", fmt.Errorf("estado nulo"))
+				// Crear un estado vacío para evitar errores
+				gameState = &pb.GameState{
+					GameId:   1,
+					Players:  &pb.PlayerList{Players: []*pb.PlayerData{}},
+					Missiles: &pb.MissileList{Missiles: []*pb.MissileData{}},
+					Meteors:  &pb.MeteorList{Meteors: []*pb.MeteorData{}},
+					GameOver: false,
+				}
+			}
+			
+			// Asegurar que la lista de jugadores exista
+			if gameState.Players == nil {
+				gameState.Players = &pb.PlayerList{Players: []*pb.PlayerData{}}
+			}
+			
+			playerCount := 0
+			if gameState.Players.Players != nil {
+				playerCount = len(gameState.Players.Players)
+			}
+			
 			s.server.Logger.LogMessage(
 				fmt.Sprintf("Enviando estado del juego al jugador %d con %d jugadores activos", 
-					req.PlayerId, len(gameState.Players.Players)),
+					req.PlayerId, playerCount),
 			)
 			
 			if err := stream.Send(gameState); err != nil {
@@ -332,6 +440,12 @@ func (s *GameServiceImpl) GetGameState(stream pb.GameService_GetGameStateServer)
 
 // Actualiza el estado global del juego
 func (s *GameServiceImpl) updateGameState() {
+	// Si el juego está activo, él actualiza el estado automáticamente
+	if s.game != nil {
+		return
+	}
+
+	// Si no hay juego activo, actualizar manualmente (comportamiento original)
 	s.server.StateMutex.Lock()
 	defer s.server.StateMutex.Unlock()
 
@@ -385,4 +499,4 @@ func (s *GameServiceImpl) handlePlayerDisconnect(playerID int32) {
 
 	// Actualizar el estado del juego después de la desconexión
 	s.updateGameState()
-} 
+}

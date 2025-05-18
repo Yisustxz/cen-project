@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/Yisustxz/cen-project/backend/config"
+	pb "github.com/Yisustxz/cen-project/backend/internal/service"
 	"github.com/Yisustxz/cen-project/backend/server"
 	"github.com/Yisustxz/cen-project/backend/types"
 	"github.com/Yisustxz/cen-project/backend/utils"
@@ -24,9 +25,15 @@ func main() {
 
 	// Crear instancia del servidor
 	gameServer := &types.GameServer{
-		Players:           make(map[int32]*types.Player),
-		NextPlayerID:      1,
-		GameState:         nil, // Se inicializará cuando se actualice el estado
+		Players:      make(map[int32]*types.Player),
+		NextPlayerID: 1,
+		GameState: &pb.GameState{
+			GameId:   1,
+			Players:  &pb.PlayerList{Players: []*pb.PlayerData{}},
+			Missiles: &pb.MissileList{Missiles: []*pb.MissileData{}},
+			Meteors:  &pb.MeteorList{Meteors: []*pb.MeteorData{}},
+			GameOver: false,
+		},
 	}
 
 	// Configurar el logger
@@ -47,7 +54,7 @@ func main() {
 	// Manejar señales para cierre adecuado
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	
+
 	// Esperar hasta que se reciba una señal de terminación
 	<-c
 	logger.LogMessage("Servidor detenido")
