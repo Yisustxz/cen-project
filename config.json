@@ -28,8 +28,8 @@
     "port": 9090,
     "debug": true,
     "maxPlayers": 4,
-    "maxMeteors": 12,
-    "meteorSpawnFrequency": 1.5,
+    "maxMeteors": 25,
+    "meteorSpawnFrequency": 1,
     "initialMeteorCount": 3
   }
 }
