@@ -49,7 +49,7 @@ func (s *GameServiceImpl) StartGame() {
 
 		// Iniciar el motor de juego
 		s.game.Start()
-		
+
 		s.server.Logger.LogMessage("¡Game loop iniciado correctamente! Generación de meteoritos activada.")
 	} else {
 		s.server.Logger.LogError("Error al iniciar el juego", fmt.Errorf("objeto game es nil"))
