@@ -1,21 +1,151 @@
 syntax = "proto3";
 
+package proto;
+
 option go_package = "github.com/Yisustxz/cen-project/backend/internal/service";
 
-package game;
-
-// Mensaje que envía el jugador
-message PlayerInput {
-  string player_id = 1;
-  string action = 2;
+// Vector2D representa una posición o velocidad en 2D
+message Vector2D {
+  float x = 1;
+  float y = 2;
 }
 
-// Mensaje que responde el servidor
+// Solicitud para conectarse al servidor
+message ConnectRequest {
+  string player_name = 1;
+}
+
+// Respuesta a la solicitud de conexión
+message ConnectResponse {
+  int32 player_id = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+// Datos de un jugador
+message PlayerData {
+  int32 player_id = 1;
+  string name = 2;
+  Vector2D position = 3;
+  float velocity_x = 4;
+  int32 score = 5;
+}
+
+// Lista de jugadores
+message PlayerList {
+  repeated PlayerData players = 1;
+}
+
+// Datos de un misil
+message MissileData {
+  int32 missile_id = 1;
+  int32 player_id = 2;
+  Vector2D position = 3;
+}
+
+// Lista de misiles
+message MissileList {
+  repeated MissileData missiles = 1;
+}
+
+// Datos de un meteorito
+message MeteorData {
+  int32 meteor_id = 1;
+  string meteor_type = 2;
+  Vector2D position = 3;
+  float angle = 4;
+  float rotation_speed = 5;
+}
+
+// Lista de meteoritos
+message MeteorList {
+  repeated MeteorData meteors = 1;
+}
+
+// Evento de jugador conectado
+message PlayerConnectEvent {
+  int32 player_id = 1;
+  string player_name = 2;
+}
+
+// Evento de jugador desconectado
+message PlayerDisconnectEvent {
+  int32 player_id = 1;
+  string player_name = 2;
+}
+
+// Evento de meteorito destruido
+message MeteorDestroyedEvent {
+  int32 meteor_id = 1;
+  int32 player_id = 2;
+}
+
+// Evento de actualización de puntuación
+message ScoreUpdateEvent {
+  int32 player_id = 1;
+  int32 score_delta = 2;
+}
+
+// Evento de juego
+message GameEvent {
+  string event_type = 1;
+  oneof event_data {
+    PlayerConnectEvent player_connect = 2;
+    PlayerDisconnectEvent player_disconnect = 3;
+    MeteorDestroyedEvent meteor_destroyed = 4;
+    ScoreUpdateEvent score_update = 5;
+  }
+}
+
+// Estado completo del juego
 message GameState {
-  string message = 1;
+  int32 game_id = 1;
+  PlayerList players = 2;
+  MissileList missiles = 3;
+  MeteorList meteors = 4;
+  bool game_over = 5;
 }
 
-// Servicio gRPC
+// Evento de notificación para clientes
+message NotificationEvent {
+  GameEvent event = 1;
+  int32 timestamp = 2;
+}
+
+// Solicitud del cliente al servidor
+message ClientRequest {
+  int32 player_id = 1;
+  oneof request {
+    bool disconnect = 2;
+    MeteorDestroyedEvent meteor_destroyed = 3;
+    ScoreUpdateEvent score_update = 4;
+  }
+}
+
+// Respuesta del servidor al cliente
+message ServerResponse {
+  bool success = 1;
+  string error_message = 2;
+  oneof response {
+    GameState game_state = 3;
+    NotificationEvent notification = 4;
+  }
+}
+
+// Servicio principal del juego
 service GameService {
-  rpc SendInput (PlayerInput) returns (GameState);
+  // Conectar al servidor
+  rpc Connect(ConnectRequest) returns (ConnectResponse);
+  
+  // Enviar un evento al servidor
+  rpc SendEvent(GameEvent) returns (ServerResponse);
+  
+  // Stream bidireccional para la comunicación en tiempo real
+  rpc StreamGame(stream ClientRequest) returns (stream ServerResponse);
+  
+  // Obtener el estado del juego
+  rpc GetGameState(stream ClientRequest) returns (stream GameState);
+  
+  // Suscribirse a notificaciones de eventos
+  rpc SubscribeToEvents(ClientRequest) returns (stream NotificationEvent);
 }

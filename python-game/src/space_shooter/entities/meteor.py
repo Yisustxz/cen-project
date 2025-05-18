@@ -29,8 +29,8 @@ class Meteor(GameObject):
         # Llamar al constructor de la clase padre con la imagen y tipo
         super().__init__(x, y, image, obj_type="meteor")
         
-        # ID único para el meteorito (se asignará en la creación)
-        self.id = f"meteor_default"
+        # ID único para el meteorito - por defecto None hasta que se asigne
+        self.id = None     # ID único asignado por el servidor (int32)
         
         # Guardar tipo de meteorito
         self.meteor_type = meteor_type
@@ -60,7 +60,7 @@ class Meteor(GameObject):
         Establece el ID de red para este meteorito.
         
         Args:
-            meteor_id: ID único asignado a este meteorito
+            meteor_id: ID único asignado a este meteorito (int32)
         """
         self.id = meteor_id
 

@@ -13,9 +13,9 @@ class OtherMissile(GameObject):
         # Inicializar primero sin imagen, pero con tipo "other_missile"
         super().__init__(x, y, None, obj_type="other_missile")
         
-        # Guardar IDs para tracking en red
-        self.id = missile_id
-        self.player_id = player_id
+        # Guardar IDs para tracking en red - estos son valores enteros (int32)
+        self.id = missile_id        # ID único del misil (int32)
+        self.player_id = player_id  # ID del jugador que disparó (int32)
         
         # Cargar datos de configuración
         missile_config = PlayerData.get_missile_data()

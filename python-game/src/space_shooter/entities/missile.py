@@ -21,9 +21,9 @@ class Missile(GameObject):
         # Inicializar primero sin imagen, pero con tipo "missile"
         super().__init__(x, y, None, obj_type="missile")
         
-        # IDs para networking
-        self.id = f"missile_default"
-        self.player_id = player_id
+        # IDs para networking - por defecto None hasta que se asignen
+        self.id = None             # ID único del misil (int32)
+        self.player_id = player_id # ID del jugador que disparó (int32)
         
         # Cargar datos de configuración
         missile_config = PlayerData.get_missile_data()
@@ -68,7 +68,7 @@ class Missile(GameObject):
         Establece los IDs de red para este misil.
         
         Args:
-            missile_id: ID único asignado a este misil
+            missile_id: ID único asignado a este misil (int32)
             player_id: ID del jugador que disparó este misil (opcional)
         """
         self.id = missile_id

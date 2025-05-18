@@ -13,9 +13,9 @@ class OtherPlayer(GameObject):
         super().__init__(x, y, None, "other_player")
         
         # Identificadores de red
-        self.player_id = player_id
+        self.player_id = player_id       # ID asignado por el servidor (int32)
         self.player_name = player_name
-        self.id = f"player_{player_id}"  # ID único del objeto para networking
+        self.id = player_id              # ID único del objeto (int32), mismo que player_id
         
         # Cargar datos de configuración
         player_config = PlayerData.get_player_data()

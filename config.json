@@ -4,6 +4,12 @@
       "enable": true,
       "skipMenu": true
     },
+    "multiplayerMode": {
+      "enable": false,
+      "skipMenu": false,
+      "ipAddress": "localhost",
+      "port": 9090
+    },
     "display": {
       "width": 800,
       "height": 600,
@@ -14,5 +20,11 @@
       "width": 400,
       "height": 300
     }
+  },
+  "backend": {
+    "ip": "localhost",
+    "port": 9090,
+    "debug": true,
+    "maxPlayers": 4
   }
 }

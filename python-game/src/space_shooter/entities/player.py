@@ -14,9 +14,9 @@ class Player(GameObject):
         # La imagen la asignaremos después, cuando esté disponible
         super().__init__(x, y, None, "player")
         
-        # Identificadores para red
-        self.id = "player_local"       # ID único para el objeto
-        self.player_id = "local"       # ID asignado por el servidor
+        # Identificadores para red - por defecto son None hasta que se conecte al servidor
+        self.id = None             # ID único para el objeto (int32)
+        self.player_id = None      # ID asignado por el servidor (int32)
         
         # Cargar datos de configuración
         player_config = PlayerData.get_player_data()
@@ -41,11 +41,11 @@ class Player(GameObject):
         Establece los identificadores de red para este jugador.
         
         Args:
-            player_id: ID asignado por el servidor para este jugador
+            player_id: ID asignado por el servidor para este jugador (int32)
             object_id: ID único del objeto (opcional, se usará player_id si no se proporciona)
         """
         self.player_id = player_id
-        self.id = object_id or f"player_{player_id}"
+        self.id = object_id if object_id is not None else player_id
         
     def set_images(self, image, damage_image):
         """
