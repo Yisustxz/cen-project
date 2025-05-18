@@ -29,6 +29,9 @@ class Meteor(GameObject):
         # Llamar al constructor de la clase padre con la imagen y tipo
         super().__init__(x, y, image, obj_type="meteor")
         
+        # ID único para el meteorito (se asignará en la creación)
+        self.id = f"meteor_default"
+        
         # Guardar tipo de meteorito
         self.meteor_type = meteor_type
         
@@ -51,6 +54,15 @@ class Meteor(GameObject):
         
         # Para almacenar puntos ganados al ser destruido
         self.points_earned = 0
+
+    def set_network_id(self, meteor_id):
+        """
+        Establece el ID de red para este meteorito.
+        
+        Args:
+            meteor_id: ID único asignado a este meteorito
+        """
+        self.id = meteor_id
 
     def on_update(self):
         """
@@ -93,6 +105,7 @@ class Meteor(GameObject):
             # Si tiene acceso al juego, notificar la destrucción
             if self.game:
                 self.game.emit_event("meteor_destroyed", {
+                    "meteor_id": self.id,
                     "points": self.points,
                     "x": self.x,
                     "y": self.y,

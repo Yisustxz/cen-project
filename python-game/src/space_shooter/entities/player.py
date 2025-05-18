@@ -4,6 +4,7 @@ Clase Player - Representa al jugador controlado por el usuario.
 import pygame
 from motor.sprite import GameObject
 from space_shooter.data.player_data import PlayerData
+from space_shooter.entities.missile import Missile
 from config import Config
 
 class Player(GameObject):
@@ -12,6 +13,10 @@ class Player(GameObject):
     def __init__(self, x, y):
         # La imagen la asignaremos después, cuando esté disponible
         super().__init__(x, y, None, "player")
+        
+        # Identificadores para red
+        self.id = "player_local"       # ID único para el objeto
+        self.player_id = "local"       # ID asignado por el servidor
         
         # Cargar datos de configuración
         player_config = PlayerData.get_player_data()
@@ -30,6 +35,17 @@ class Player(GameObject):
         # Para el sistema de daño e invencibilidad
         self.damage_image = None  # Imagen con efecto de daño
         self.invincibility_frames = 0  # Contador de frames de invencibilidad
+        
+    def set_network_ids(self, player_id, object_id=None):
+        """
+        Establece los identificadores de red para este jugador.
+        
+        Args:
+            player_id: ID asignado por el servidor para este jugador
+            object_id: ID único del objeto (opcional, se usará player_id si no se proporciona)
+        """
+        self.player_id = player_id
+        self.id = object_id or f"player_{player_id}"
         
     def set_images(self, image, damage_image):
         """
@@ -173,18 +189,12 @@ class Player(GameObject):
             
         # Disparar misil
         if keys[K_SPACE]:
-            current_time = pygame.time.get_ticks()
-            # Verificar cooldown
-            if current_time - self.last_missile > self.missile_cooldown:
-                if self.game:
-                    # Emitir evento para crear un misil en la posición del hitbox
-                    # El offset ya no afecta al hitbox, sino a la posición del sprite
-                    self.game.emit_event("player_fire_missile", {
-                        "x": self.x,  # Usar la posición central del hitbox
-                        "y": self.y
-                    })
-                    self.last_missile = current_time
-                    action_performed = True
+            # Usar el nuevo método fire_missile
+            missile = self.fire_missile()
+            if missile and self.game:
+                # Registrar el misil con el juego
+                self.game.register_object(missile)
+                action_performed = True
             
         return action_performed
     
@@ -197,3 +207,31 @@ class Player(GameObject):
         """
         self.lives += lives
         print(f"Jugador obtuvo {lives} vida(s) extra")
+
+    def fire_missile(self):
+        """
+        Crea un nuevo misil en la posición del jugador.
+        El misil es creado en el centro superior del jugador.
+        """
+        # Comprobar si el tiempo transcurrido es suficiente para disparar
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_missile < self.missile_cooldown:
+            return None  # No ha pasado suficiente tiempo
+        
+        # Actualizar tiempo del último disparo
+        self.last_missile = current_time
+        
+        # Crear un nuevo misil en la posición del jugador
+        # Usamos self.x y self.y que ahora son el centro del hitbox
+        # El misil se sitúa en el centro superior
+        missile = Missile(self.x, self.y - self.hitbox.height/2, self.player_id)
+        
+        # Si tiene acceso al juego, notificar que se creó un misil
+        if self.game:
+            self.game.emit_event("missile_fired", {
+                "player_id": self.player_id,
+                "x": self.x,
+                "y": self.y - self.hitbox.height/2
+            })
+        
+        return missile

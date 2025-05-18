@@ -3,15 +3,27 @@ Clase Missile - Representa los proyectiles disparados por el jugador.
 """
 import pygame
 from motor.sprite import GameObject
-from space_shooter.data.player_data import PlayerData
 from space_shooter.core.constants import WHITE
+from space_shooter.data.player_data import PlayerData
 
 class Missile(GameObject):
-    """Clase que representa los misiles disparados por el jugador."""
+    """Clase que representa un misil disparado por el jugador."""
     
-    def __init__(self, x, y):
+    def __init__(self, x, y, player_id=None):
+        """
+        Inicializa un nuevo misil.
+        
+        Args:
+            x: Posición x inicial del misil
+            y: Posición y inicial del misil
+            player_id: ID del jugador que disparó este misil (opcional)
+        """
         # Inicializar primero sin imagen, pero con tipo "missile"
         super().__init__(x, y, None, obj_type="missile")
+        
+        # IDs para networking
+        self.id = f"missile_default"
+        self.player_id = player_id
         
         # Cargar datos de configuración
         missile_config = PlayerData.get_missile_data()
@@ -51,51 +63,74 @@ class Missile(GameObject):
         self.should_destroy = False
         self.has_hit = False
 
+    def set_network_ids(self, missile_id, player_id=None):
+        """
+        Establece los IDs de red para este misil.
+        
+        Args:
+            missile_id: ID único asignado a este misil
+            player_id: ID del jugador que disparó este misil (opcional)
+        """
+        self.id = missile_id
+        if player_id is not None:
+            self.player_id = player_id
+
     def on_update(self):
         """
-        Lógica específica de actualización del misil.
-        Este método es llamado automáticamente por la clase base GameObject.
+        Método llamado en cada actualización de frame.
+        Verifica si el misil debe ser eliminado por salir de la pantalla.
         """
-        # Ya no es necesario mover el misil, lo hace la clase base con delta time
-        
-        # Verificar si el misil sigue en pantalla
-        if self.hitbox.bottom <= 0:
-            self.should_destroy = True
-            
-        # Si debe ser destruido, notificar al juego y eliminarse
-        if self.should_destroy and self.game:
-            # Notificar al juego que debe ser eliminado
-            self.game.emit_event("missile_destroyed", {"missile": self})
-            
-            # Eliminar el misil del registro
-            self.game.unregister_object(self)
-            self.kill()  # Eliminar de todos los grupos de sprites
-    
+        # Eliminar el misil si sale por la parte superior de la pantalla
+        if self.y < -50:
+            # Si tiene referencia al juego, desregistrar el misil
+            if self.game:
+                self.game.unregister_object(self)
+            self.kill()
+
     def on_collide(self, other_entity):
-        """Maneja la colisión con otra entidad."""
-        if other_entity.type == "meteor" and not self.has_hit:
-            self.has_hit = True
-            self.should_destroy = True
+        """
+        Maneja la colisión con otra entidad.
+        
+        Args:
+            other_entity: La entidad con la que colisiona este misil
+            
+        Returns:
+            bool: True si el misil debe ser destruido, False en caso contrario
+        """
+        # Si colisiona con un meteorito, el misil se destruye
+        if other_entity.type == "meteor":
+            # Si tiene referencia al juego, notificar la colisión
+            if self.game:
+                self.game.emit_event("missile_hit", {
+                    "missile_id": self.id,
+                    "player_id": self.player_id,
+                    "hit_entity": other_entity,
+                    "x": self.x,
+                    "y": self.y
+                })
+                self.game.unregister_object(self)
+            
+            # Destruir el misil
+            self.kill()
             return True
+            
+        # Para ahora, no destruir el misil si colisiona con otra cosa
         return False
-    
+
     def get_damage(self):
-        """
-        Obtiene el daño que causa este misil.
-        
-        Returns:
-            int: Cantidad de daño que inflige el misil
-        """
+        """Devuelve el daño que causa este misil."""
         return self.damage
-    
-    def should_be_destroyed(self):
+
+    def should_destroy(self):
         """
-        Comprueba si el misil debe ser eliminado.
+        Indica si el misil debe ser destruido.
+        Útil para manejar la destrucción desde fuera de la clase.
         
         Returns:
-            bool: True si el misil debe ser eliminado, False en caso contrario
+            bool: True si el misil debe ser destruido
         """
-        return self.should_destroy
+        # Si está fuera de la pantalla, se marca para destrucción
+        return self.y < -50
 
     def on_game_event(self, event_type, data=None):
         """
@@ -109,17 +144,8 @@ class Missile(GameObject):
             bool: True si el evento fue manejado, False en caso contrario
         """
         if event_type == "game_over":
-            # Auto-destruir el misil cuando termina el juego
-            self.should_destroy = True
+            # Detener el movimiento
+            self.set_velocity(0, 0)
             return True
-        elif event_type == "meteor_destroyed":
-            # Si un meteorito fue destruido cerca, el misil podría reaccionar
-            if data and 'x' in data and 'y' in data:
-                distance = ((self.x - data['x'])**2 + (self.y - data['y'])**2)**0.5
-                if distance < 50:  # Si el meteorito explotó muy cerca
-                    # Crear efecto visual, si el misil tiene acceso al juego
-                    # se podría crear un efecto particular aquí
-                    self.should_destroy = True
-                    return True
-        
+            
         return False

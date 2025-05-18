@@ -66,7 +66,7 @@ class OtherMissile(GameObject):
             # Eliminar el misil del registro
             self.game.unregister_object(self)
             self.kill()  # Eliminar de todos los grupos de sprites
-    
+
     def on_collide(self, other_entity):
         """
         Maneja la colisión con otra entidad.
@@ -81,7 +81,7 @@ class OtherMissile(GameObject):
             
             return True
         return False
-    
+
     def get_damage(self):
         """
         Obtiene el daño que causa este misil (solo visual, no causa daño real).
@@ -90,7 +90,7 @@ class OtherMissile(GameObject):
             int: Cantidad de daño que inflige el misil
         """
         return 0  # No causa daño real
-    
+
     def should_be_destroyed(self):
         """
         Comprueba si el misil debe ser eliminado.
@@ -115,5 +115,5 @@ class OtherMissile(GameObject):
             # Auto-destruir el misil cuando termina el juego
             self.should_destroy = True
             return True
-        
+            
         return False 

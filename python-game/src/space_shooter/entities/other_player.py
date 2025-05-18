@@ -15,6 +15,7 @@ class OtherPlayer(GameObject):
         # Identificadores de red
         self.player_id = player_id
         self.player_name = player_name
+        self.id = f"player_{player_id}"  # ID único del objeto para networking
         
         # Cargar datos de configuración
         player_config = PlayerData.get_player_data()
@@ -97,7 +98,7 @@ class OtherPlayer(GameObject):
         """
         # No hacer nada, el jugador original maneja sus colisiones
         return False
-
+    
     def on_game_event(self, event_type, data=None):
         """
         Maneja eventos emitidos por el juego.
@@ -122,8 +123,8 @@ class OtherPlayer(GameObject):
                 if 'lives' in data:
                     self.lives = data['lives']
                 return True
-        
-        return False
+            
+        return False 
         
     def update_position(self, x, y, speed_x, speed_y):
         """
