@@ -1,0 +1,1185 @@
+\documentclass[12pt,letterpaper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\geometry{letterpaper, margin=2.5cm}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{1em}{}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{\textbf{Implementación de un Sistema Multijugador para Space Shooter}}
+\author{Proyecto Anna \\ Universidad}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introducción}
+
+Space Shooter es un juego de tipo arcade desarrollado en Python utilizando la biblioteca Pygame, donde el jugador controla una nave espacial y debe esquivar y destruir meteoritos que caen desde la parte superior de la pantalla. Originalmente desarrollado como un juego para un solo jugador, este proyecto busca ampliar sus características para permitir la modalidad multijugador.
+
+El objetivo principal es transformar la experiencia de juego individual en una experiencia multijugador cooperativa, donde múltiples jugadores puedan unirse a una misma partida para enfrentar juntos la amenaza de los meteoritos. Para lograr esto, se implementará una arquitectura cliente-servidor, donde un servidor desarrollado en Go gestionará la lógica del juego y la comunicación entre los clientes mediante gRPC.
+
+La elección de estas tecnologías responde a necesidades específicas del proyecto:
+
+\begin{itemize}
+    \item \textbf{Python con Pygame}: Mantiene la base del cliente por su facilidad para el desarrollo de interfaces gráficas y la lógica de juego local.
+    \item \textbf{Go para el servidor}: Aprovecha su rendimiento y soporte nativo para concurrencia, ideal para gestionar múltiples conexiones simultáneas.
+    \item \textbf{gRPC}: Proporciona un marco de comunicación eficiente y tipado entre lenguajes diferentes, con soporte para streams bidireccionales.
+\end{itemize}
+
+Este informe detalla el proceso de análisis, diseño e implementación del sistema multijugador para Space Shooter, abordando los desafíos técnicos encontrados y las soluciones propuestas, así como los resultados obtenidos y las posibles mejoras futuras.
+
+\section{Análisis del Problema}
+
+\subsection{Estado Actual del Juego}
+
+El juego Space Shooter en su versión original es una aplicación monolítica para un solo jugador que ejecuta toda la lógica del juego en un mismo proceso. El juego cuenta con los siguientes componentes principales:
+
+\begin{itemize}
+    \item \textbf{Motor del juego}: Gestiona el bucle principal, la detección de colisiones y el renderizado.
+    \item \textbf{Gestor de objetos}: Administra la creación, actualización y destrucción de entidades del juego.
+    \item \textbf{Sistema de tiempo delta}: Asegura que el movimiento de los objetos sea consistente independientemente de la velocidad de cuadros.
+    \item \textbf{Entidades}: Clases que representan al jugador, meteoritos, misiles y otros elementos del juego.
+    \item \textbf{Gestor de meteoritos}: Controla la generación y comportamiento de los meteoritos.
+\end{itemize}
+
+La estructura del código sigue un patrón orientado a objetos con un sistema de eventos para la comunicación entre componentes. Sin embargo, toda esta lógica está diseñada para ejecutarse en un único proceso, sin considerar la sincronización entre múltiples instancias del juego.
+
+\subsection{Desafíos de la Implementación Multijugador}
+
+La transformación del juego en un sistema multijugador implica afrontar varios desafíos técnicos:
+
+\begin{enumerate}
+    \item \textbf{Sincronización de estado}: Mantener coherente el estado del juego entre todos los clientes conectados es fundamental. Esto incluye la posición de los jugadores, los meteoritos y los misiles.
+    
+    \item \textbf{Latencia de red}: Los retrasos en la comunicación pueden afectar significativamente la experiencia de juego. Es necesario implementar técnicas como la predicción local y la reconciliación con el servidor para minimizar su impacto.
+    
+    \item \textbf{Autoridad del servidor}: Para prevenir trampas y mantener la coherencia, el servidor debe ser la autoridad final sobre el estado del juego, validando las acciones de los clientes.
+    
+    \item \textbf{Escalabilidad}: El sistema debe ser capaz de manejar múltiples jugadores simultáneos sin degradar el rendimiento, lo que requiere una gestión eficiente de los recursos.
+    
+    \item \textbf{Integración}: Adaptar el código existente para trabajar con la nueva arquitectura cliente-servidor sin reescribir completamente el juego.
+    
+    \item \textbf{Interoperabilidad}: Garantizar la comunicación eficiente entre el cliente Python y el servidor Go, dos lenguajes con paradigmas y sistemas de tipos diferentes.
+\end{enumerate}
+
+\subsection{Requisitos del Sistema Multijugador}
+
+Para implementar un sistema multijugador funcional, se han establecido los siguientes requisitos:
+
+\begin{itemize}
+    \item \textbf{Conexión y desconexión fluida}: Permitir que los jugadores se unan o abandonen la partida en cualquier momento sin afectar a los demás participantes.
+    
+    \item \textbf{Sincronización de entidades}: Todos los clientes deben ver los mismos meteoritos, jugadores y misiles en posiciones coherentes.
+    
+    \item \textbf{Transmisión de acciones}: Las acciones de cada jugador (movimiento, disparo) deben reflejarse en todos los clientes conectados.
+    
+    \item \textbf{Gestión de colisiones}: Las colisiones entre entidades deben detectarse y procesarse de manera consistente en todos los clientes.
+    
+    \item \textbf{Sistema de puntuación compartida}: Mantener un registro de la puntuación de cada jugador visible para todos los participantes.
+    
+    \item \textbf{Tolerancia a la latencia}: El juego debe mantenerse jugable incluso con cierto nivel de latencia en la red.
+    
+    \item \textbf{Recuperación ante desconexiones}: Capacidad para manejar desconexiones temporales sin perder el progreso del jugador.
+\end{itemize}
+
+\section{Diseño de la Solución}
+
+\subsection{Arquitectura Cliente-Servidor}
+
+Para abordar los desafíos identificados, se ha optado por una arquitectura cliente-servidor con una clara separación de responsabilidades:
+
+\begin{itemize}
+    \item \textbf{Cliente (Python)}:
+    \begin{itemize}
+        \item Renderización de la interfaz gráfica
+        \item Captura de entrada del usuario
+        \item Predicción local para movimiento fluido
+        \item Comunicación con el servidor mediante gRPC
+    \end{itemize}
+    
+    \item \textbf{Servidor (Go)}:
+    \begin{itemize}
+        \item Gestión del estado autoritativo del juego
+        \item Generación y control de meteoritos
+        \item Validación de acciones de los jugadores
+        \item Detección de colisiones
+        \item Difusión de eventos a todos los clientes
+    \end{itemize}
+\end{itemize}
+
+Esta separación permite centralizar la lógica crítica en el servidor, reduciendo la posibilidad de inconsistencias y facilitando la sincronización. El servidor actúa como fuente de verdad, mientras que los clientes implementan técnicas de predicción para mantener una experiencia fluida a pesar de la latencia.
+
+\begin{figure}[H]
+    \centering
+    \begin{lstlisting}[language=text]
+    +---------------+                 +---------------+
+    |               |                 |               |
+    |  Cliente 1    |<--------------->|               |
+    |  (Python)     |                 |               |
+    |               |                 |               |
+    +---------------+                 |               |
+                                     |               |
+    +---------------+                 |   Servidor   |
+    |               |                 |     (Go)     |
+    |  Cliente 2    |<--------------->|               |
+    |  (Python)     |                 |               |
+    |               |                 |               |
+    +---------------+                 |               |
+                                     |               |
+    +---------------+                 |               |
+    |               |                 |               |
+    |  Cliente N    |<--------------->|               |
+    |  (Python)     |                 |               |
+    |               |                 |               |
+    +---------------+                 +---------------+
+    \end{lstlisting}
+    \caption{Diagrama de la arquitectura cliente-servidor}
+\end{figure}
+
+\subsection{Arquitectura del Backend (Servidor Go)}
+
+El backend del sistema está implementado en Go, aprovechando las capacidades de concurrencia y rendimiento de este lenguaje para gestionar múltiples conexiones simultáneas. La arquitectura del servidor sigue un diseño modular con componentes claramente definidos.
+
+\subsubsection{Estructura del Servidor}
+
+\begin{figure}[H]
+    \centering
+    \begin{lstlisting}[language=text]
+    +-------------------------------------------------------+
+    |                   GameServiceImpl                     |
+    |          (Implementación de la API gRPC)              |
+    +-------------------------------------------------------+
+                           |
+                           v
+    +-------------------------------------------------------+
+    |                     GameServer                        |
+    |          (Gestión global del juego)                   |
+    +-------------------------------------------------------+
+                           |
+                           v
+    +-------------------------------------------------------+
+    |                       Game                            |
+    |          (Lógica principal del juego)                 |
+    +-------------------------------------------------------+
+                  /                   \
+                 /                     \
+                v                       v
+    +-------------------+     +-------------------+
+    |   MeteorManager   |     |   ObjectsManager  |
+    | (Generación de    |     | (Gestión de       |
+    |  meteoritos)      |     |  entidades)       |
+    +-------------------+     +-------------------+
+    \end{lstlisting}
+    \caption{Estructura de componentes del servidor}
+\end{figure}
+
+\subsubsection{Componentes Principales}
+
+\begin{itemize}
+    \item \textbf{GameServiceImpl}: Implementa la interfaz gRPC definida en el archivo proto. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Manejar solicitudes de conexión y desconexión de clientes
+        \item Gestionar actualizaciones de posición de jugadores
+        \item Procesar solicitudes de disparo
+        \item Mantener streams de eventos para cada cliente conectado
+        \item Transmitir eventos del juego a los clientes
+    \end{itemize}
+    
+    \item \textbf{GameServer}: Actúa como contenedor principal para el estado global del juego. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Mantener registro de todos los jugadores conectados
+        \item Coordinar la comunicación entre componentes
+        \item Gestionar el ciclo de vida del juego
+        \item Aplicar reglas globales del juego
+    \end{itemize}
+    
+    \item \textbf{Game}: Implementa la lógica principal del juego. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Ejecutar el bucle principal de actualización
+        \item Coordinar la generación de meteoritos
+        \item Detectar y resolver colisiones
+        \item Gestionar el sistema de puntuación
+        \item Emitir eventos del juego
+    \end{itemize}
+    
+    \item \textbf{MeteorManager}: Gestiona la creación y comportamiento de meteoritos. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Generar nuevos meteoritos con propiedades aleatorias
+        \item Actualizar la posición y rotación de los meteoritos
+        \item Gestionar la destrucción de meteoritos
+        \item Mantener el equilibrio de dificultad
+    \end{itemize}
+    
+    \item \textbf{ObjectsManager}: Sistema genérico para gestionar entidades del juego. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Mantener registro de todas las entidades activas
+        \item Gestionar el ciclo de vida de las entidades
+        \item Proporcionar métodos para consultar entidades
+        \item Optimizar las comprobaciones de colisión
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Gestión de Concurrencia}
+
+Una de las principales ventajas de utilizar Go es su modelo de concurrencia basado en goroutines y canales. El servidor aprovecha estas características para:
+
+\begin{itemize}
+    \item \textbf{Manejo de conexiones concurrentes}: Cada cliente conectado es atendido por una goroutine dedicada, permitiendo gestionar cientos de conexiones simultáneas sin bloquear el hilo principal.
+    
+    \item \textbf{Sincronización de estado}: Se utilizan mutexes (sync.Mutex) para proteger el acceso concurrente a datos compartidos, como la lista de jugadores o meteoritos.
+    
+    \item \textbf{Comunicación entre componentes}: Los canales de Go se utilizan para la comunicación asíncrona entre componentes, permitiendo un diseño desacoplado.
+\end{itemize}
+
+\begin{lstlisting}[language=go, caption=Gestión de streams de clientes]
+// Estructura para mantener los streams de clientes
+type ClientStreamManager struct {
+    streams map[string]pb.GameService_SubscribeToEventsServer
+    mutex   sync.RWMutex
+}
+
+// Añadir un nuevo stream
+func (m *ClientStreamManager) AddStream(playerID string, stream pb.GameService_SubscribeToEventsServer) {
+    m.mutex.Lock()
+    defer m.mutex.Unlock()
+    m.streams[playerID] = stream
+}
+
+// Eliminar un stream
+func (m *ClientStreamManager) RemoveStream(playerID string) {
+    m.mutex.Lock()
+    defer m.mutex.Unlock()
+    delete(m.streams, playerID)
+}
+
+// Limpiar streams inactivos periódicamente
+func (m *ClientStreamManager) CleanupInactiveStreams() {
+    for {
+        time.Sleep(30 * time.Second)
+        
+        m.mutex.Lock()
+        for playerID, stream := range m.streams {
+            // Enviar ping para verificar conexión
+            err := stream.Send(&pb.EventNotification{
+                Event: &pb.GameEvent{
+                    EventType: "ping",
+                },
+            })
+            
+            if err != nil {
+                // Stream inactivo, eliminarlo
+                delete(m.streams, playerID)
+                log.Printf("Stream inactivo eliminado para jugador %s", playerID)
+            }
+        }
+        m.mutex.Unlock()
+    }
+}
+
+// Difundir evento a todos los clientes
+func (m *ClientStreamManager) BroadcastEvent(event *pb.GameEvent) {
+    notification := &pb.EventNotification{
+        Event:     event,
+        Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
+    }
+    
+    m.mutex.RLock()
+    defer m.mutex.RUnlock()
+    
+    for playerID, stream := range m.streams {
+        go func(pid string, s pb.GameService_SubscribeToEventsServer) {
+            err := s.Send(notification)
+            if err != nil {
+                log.Printf("Error al enviar evento a %s: %v", pid, err)
+            }
+        }(playerID, stream)
+    }
+}
+\end{lstlisting}
+
+\subsubsection{Ciclo de Vida del Servidor}
+
+El ciclo de vida del servidor sigue estos pasos:
+
+\begin{enumerate}
+    \item \textbf{Inicialización}: Carga de configuración, creación de componentes y preparación del servidor gRPC.
+    \item \textbf{Inicio del servicio}: El servidor comienza a escuchar conexiones entrantes.
+    \item \textbf{Inicio del bucle de juego}: Se inicia una goroutine dedicada para el bucle principal del juego.
+    \item \textbf{Procesamiento de conexiones}: Se aceptan nuevas conexiones y se crean goroutines para manejarlas.
+    \item \textbf{Actualización del estado}: El bucle de juego actualiza periódicamente el estado del mundo.
+    \item \textbf{Difusión de eventos}: Los cambios en el estado se transmiten a los clientes conectados.
+    \item \textbf{Cierre ordenado}: Al recibir una señal de terminación, el servidor cierra las conexiones y libera recursos.
+\end{enumerate}
+
+\begin{lstlisting}[language=go, caption=Inicialización del servidor]
+func main() {
+    // Cargar configuración
+    config := config.LoadConfig()
+    
+    // Configurar logger
+    logger := utils.NewLogger(config.LogLevel)
+    logger.Info("Iniciando servidor Space Shooter")
+    
+    // Crear instancia del juego
+    game := core.NewGame(config.GameConfig)
+    
+    // Crear servidor gRPC
+    server := grpc.NewServer()
+    
+    // Crear implementación del servicio
+    gameService := server.NewGameServiceImpl(game)
+    pb.RegisterGameServiceServer(server, gameService)
+    
+    // Iniciar servidor HTTP para gRPC
+    lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
+    if err != nil {
+        logger.Fatal("Error al iniciar servidor: %v", err)
+    }
+    
+    // Iniciar goroutine para el bucle del juego
+    go game.Run()
+    
+    // Manejar señales de terminación
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+    
+    // Iniciar goroutine para monitorear señales
+    go func() {
+        sig := <-sigChan
+        logger.Info("Recibida señal %v, cerrando servidor...", sig)
+        server.GracefulStop()
+    }()
+    
+    // Iniciar servidor
+    logger.Info("Servidor escuchando en puerto %d", config.Port)
+    if err := server.Serve(lis); err != nil {
+        logger.Fatal("Error en servidor: %v", err)
+    }
+}
+\end{lstlisting}
+
+\subsubsection{Generación de Meteoritos}
+
+Uno de los componentes clave del servidor es el sistema de generación de meteoritos, que crea nuevos desafíos para los jugadores de forma dinámica:
+
+\begin{lstlisting}[language=go, caption=Sistema de generación de meteoritos]
+// MeteorManager gestiona la creación y comportamiento de meteoritos
+type MeteorManager struct {
+    game            *Game
+    meteors         map[string]*entities.Meteor
+    mutex           sync.RWMutex
+    nextMeteorID    int
+    spawnRate       time.Duration
+    lastSpawnTime   time.Time
+    difficultyLevel int
+}
+
+// Actualizar el gestor de meteoritos
+func (mm *MeteorManager) Update(deltaTime float64) {
+    // Verificar si es momento de generar un nuevo meteorito
+    if time.Since(mm.lastSpawnTime) >= mm.spawnRate {
+        mm.SpawnMeteor()
+        mm.lastSpawnTime = time.Now()
+        
+        // Ajustar tasa de generación según dificultad
+        mm.spawnRate = mm.calculateSpawnRate()
+    }
+    
+    // Actualizar todos los meteoritos existentes
+    mm.mutex.Lock()
+    for id, meteor := range mm.meteors {
+        meteor.Update(deltaTime)
+        
+        // Eliminar meteoritos que salen de la pantalla
+        if mm.isOutOfBounds(meteor) {
+            delete(mm.meteors, id)
+        }
+    }
+    mm.mutex.Unlock()
+}
+
+// Generar un nuevo meteorito con propiedades aleatorias
+func (mm *MeteorManager) SpawnMeteor() {
+    mm.mutex.Lock()
+    defer mm.mutex.Unlock()
+    
+    // Crear ID único
+    meteorID := fmt.Sprintf("meteor_%d", mm.nextMeteorID)
+    mm.nextMeteorID++
+    
+    // Determinar tipo de meteorito según dificultad
+    meteorType := mm.selectMeteorType()
+    
+    // Calcular posición inicial (fuera de la pantalla)
+    position := mm.calculateSpawnPosition()
+    
+    // Calcular velocidad (hacia el centro de la pantalla)
+    velocity := mm.calculateVelocity(position)
+    
+    // Crear nuevo meteorito
+    meteor := entities.NewMeteor(
+        meteorID,
+        meteorType,
+        position,
+        velocity,
+        mm.randomRotation(),
+        mm.randomRotationSpeed(),
+    )
+    
+    // Añadir a la colección
+    mm.meteors[meteorID] = meteor
+    
+    // Notificar a los clientes
+    mm.game.BroadcastMeteorCreated(meteor)
+}
+\end{lstlisting}
+
+Esta arquitectura modular permite una clara separación de responsabilidades, facilitando el mantenimiento y la extensión del código. Además, el uso de goroutines y canales de Go proporciona un rendimiento excelente incluso con múltiples jugadores conectados simultáneamente.
+
+\subsection{Protocolo de Comunicación}
+
+La comunicación entre cliente y servidor se realiza mediante gRPC, utilizando Protocol Buffers para definir los mensajes y servicios. El archivo \texttt{game.proto} define la interfaz de comunicación:
+
+\begin{lstlisting}[language=proto, caption=Extracto de game.proto con definiciones principales]
+syntax = "proto3";
+
+package proto;
+
+// Vector2D representa una posición o velocidad en 2D
+message Vector2D {
+  float x = 1;
+  float y = 2;
+}
+
+// Evento de jugador conectado
+message PlayerConnectEvent {
+  int32 player_id = 1;
+  string player_name = 2;
+}
+
+// Evento de meteorito creado
+message MeteorCreatedEvent {
+  int32 meteor_id = 1;
+  string meteor_type = 2;
+  Vector2D position = 3;
+  float angle = 4;
+  float rotation_speed = 5;
+  Vector2D velocity = 6;
+}
+
+// Evento de juego genérico
+message GameEvent {
+  string event_type = 1;
+  oneof event_data {
+    PlayerConnectEvent player_connect = 2;
+    PlayerDisconnectEvent player_disconnect = 3;
+    MeteorDestroyedEvent meteor_destroyed = 4;
+    ScoreUpdateEvent score_update = 5;
+    PlayerPositionEvent player_position = 6;
+    MeteorCreatedEvent meteor_created = 7;
+  }
+}
+
+// Servicio principal del juego
+service GameService {
+  rpc Connect(ConnectRequest) returns (ConnectResponse);
+  rpc SendEvent(GameEvent) returns (ServerResponse);
+  rpc GetGameState(stream ClientRequest) returns (stream GameState);
+  rpc SubscribeToEvents(ClientRequest) returns (stream NotificationEvent);
+}
+\end{lstlisting}
+
+Los principales tipos de comunicación incluyen:
+
+\begin{itemize}
+    \item \textbf{Conexión inicial}: El cliente solicita unirse al juego y recibe un ID único.
+    \item \textbf{Suscripción a eventos}: El cliente establece un stream para recibir notificaciones en tiempo real.
+    \item \textbf{Envío de acciones}: El cliente envía eventos como movimiento o disparos al servidor.
+    \item \textbf{Solicitud de estado}: El cliente puede solicitar el estado completo del juego en cualquier momento.
+\end{itemize}
+
+\subsection{Flujos de Comunicación}
+
+Se han diseñado flujos específicos para las operaciones críticas del juego:
+
+\subsubsection{Conexión de un Jugador}
+
+\begin{enumerate}
+    \item El cliente envía una solicitud \texttt{ConnectRequest} con el nombre del jugador.
+    \item El servidor asigna un ID único y responde con \texttt{ConnectResponse}.
+    \item El servidor notifica a todos los clientes sobre el nuevo jugador mediante \texttt{PlayerConnectEvent}.
+    \item El cliente solicita el estado actual del juego con \texttt{GetGameState}.
+    \item El cliente se suscribe a eventos futuros con \texttt{SubscribeToEvents}.
+\end{enumerate}
+
+\subsubsection{Creación de Meteoritos}
+
+\begin{enumerate}
+    \item El servidor genera meteoritos periódicamente mediante \texttt{MeteorManager.CreateMeteor()}.
+    \item Para cada meteorito creado, el servidor genera un ID único y determina sus propiedades (posición, velocidad, tipo).
+    \item El servidor envía un \texttt{MeteorCreatedEvent} a todos los clientes con los datos completos.
+    \item Los clientes reciben el evento y crean el meteorito localmente con las propiedades especificadas.
+    \item El meteorito se mueve de forma coherente en todos los clientes gracias al vector de velocidad compartido.
+\end{enumerate}
+
+\subsubsection{Sincronización de Posición}
+
+\begin{enumerate}
+    \item El cliente envía periódicamente la posición del jugador mediante \texttt{PlayerPositionEvent}.
+    \item El servidor actualiza el estado del jugador en su registro interno.
+    \item El servidor reenvía la posición a todos los demás clientes.
+    \item Los clientes actualizan la posición de los otros jugadores en su pantalla.
+\end{enumerate}
+
+\subsubsection{Destrucción de Meteoritos}
+
+\begin{enumerate}
+    \item Cuando un jugador destruye un meteorito, el cliente envía un \texttt{MeteorDestroyedEvent}.
+    \item El servidor valida la destrucción y actualiza el estado del juego.
+    \item El servidor notifica a todos los clientes sobre la destrucción.
+    \item El servidor actualiza y envía la puntuación del jugador.
+    \item Los clientes eliminan el meteorito y actualizan la puntuación mostrada.
+\end{enumerate}
+
+\subsection{Arquitectura del Frontend (Cliente Python)}
+
+El frontend del sistema está implementado en Python utilizando Pygame, manteniendo la base del juego original pero adaptándolo para la comunicación con el servidor. La arquitectura del cliente sigue un diseño orientado a componentes con un sistema de eventos para la comunicación interna.
+
+\subsubsection{Estructura del Cliente}
+
+\begin{figure}[H]
+    \centering
+    \begin{lstlisting}[language=text]
+    +-------------------------------------------------------+
+    |                    SpaceShooterGame                   |
+    |          (Clase principal y motor del juego)          |
+    +-------------------------------------------------------+
+                  /               |              \
+                 /                |               \
+                v                 v                v
+    +-------------------+ +------------------+ +------------------+
+    |   NetworkClient   | |   MeteorManager  | |  ObjectsManager  |
+    | (Comunicación)    | | (Meteoritos)     | | (Entidades)      |
+    +-------------------+ +------------------+ +------------------+
+            |
+            v
+    +-------------------------------------------------------+
+    |               NetworkEventsManager                    |
+    |    (Traduce eventos de red a eventos del juego)       |
+    +-------------------------------------------------------+
+    \end{lstlisting}
+    \caption{Estructura de componentes del cliente}
+\end{figure}
+
+\subsubsection{Componentes Principales}
+
+\begin{itemize}
+    \item \textbf{SpaceShooterGame}: Es la clase principal que extiende el motor base del juego (GameEngine). Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Inicializar todos los subsistemas del juego
+        \item Gestionar el bucle principal de juego (actualización y renderizado)
+        \item Procesar entradas del usuario
+        \item Coordinar la comunicación entre componentes mediante eventos
+        \item Gestionar la transición entre estados del juego (menú, juego, game over)
+    \end{itemize}
+    
+    \item \textbf{NetworkClient}: Maneja la comunicación con el servidor mediante gRPC. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Establecer y mantener la conexión con el servidor
+        \item Enviar eventos y acciones del jugador al servidor
+        \item Recibir notificaciones y eventos del servidor
+        \item Gestionar la reconexión en caso de pérdida de conexión
+        \item Manejar la desconexión ordenada al salir del juego
+    \end{itemize}
+    
+    \item \textbf{NetworkEventsManager}: Actúa como puente entre el sistema de red y el sistema de eventos del juego. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Traducir eventos de red a eventos internos del juego
+        \item Convertir acciones del juego en mensajes de red
+        \item Filtrar y procesar eventos recibidos del servidor
+        \item Gestionar la sincronización de estado entre servidor y cliente
+    \end{itemize}
+    
+    \item \textbf{MeteorManager}: Gestiona los meteoritos en el cliente. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Crear meteoritos localmente basados en eventos del servidor
+        \item Actualizar la posición y rotación de los meteoritos
+        \item Detectar colisiones con el jugador y misiles
+        \item Gestionar la destrucción de meteoritos
+    \end{itemize}
+    
+    \item \textbf{Player}: Representa al jugador local. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Procesar entradas del usuario para movimiento
+        \item Enviar actualizaciones de posición al servidor
+        \item Gestionar la lógica de disparo
+        \item Detectar colisiones con meteoritos
+        \item Renderizar la nave del jugador
+    \end{itemize}
+    
+    \item \textbf{OtherPlayer}: Representa a los jugadores remotos. Sus responsabilidades incluyen:
+    \begin{itemize}
+        \item Actualizar la posición basada en eventos del servidor
+        \item Implementar interpolación suave para movimiento fluido
+        \item Renderizar las naves de otros jugadores
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Sistema de Eventos}
+
+El cliente implementa un sistema de eventos para la comunicación desacoplada entre componentes:
+
+\begin{lstlisting}[language=python, caption=Implementación del sistema de eventos]
+class GameEngine:
+    """Motor base del juego con sistema de eventos."""
+    
+    def __init__(self, width, height, title, fps=60):
+        # ... inicialización ...
+        self.event_handlers = {}
+    
+    def emit_event(self, event_type, data=None):
+        """Emite un evento a todos los manejadores registrados."""
+        if event_type in self.event_handlers:
+            for handler in self.event_handlers[event_type]:
+                try:
+                    handler(data)
+                except Exception as e:
+                    print(f"Error en manejador de evento {event_type}: {e}")
+    
+    def on(self, event_type, handler):
+        """Registra un manejador para un tipo de evento."""
+        if event_type not in self.event_handlers:
+            self.event_handlers[event_type] = []
+        self.event_handlers[event_type].append(handler)
+\end{lstlisting}
+
+Este sistema permite que los componentes se comuniquen sin acoplamiento directo, facilitando la extensión y mantenimiento del código. Por ejemplo, cuando se recibe un evento del servidor, se traduce a un evento interno y se emite para que los componentes relevantes lo procesen:
+
+\begin{lstlisting}[language=python, caption=Ejemplo de traducción de eventos de red a eventos del juego]
+def _handle_meteor_created(self, meteor_created_data):
+    """Maneja un evento de creación de meteorito."""
+    position = meteor_created_data.position
+    velocity = meteor_created_data.velocity
+    
+    # Emitir evento al juego con todos los datos necesarios
+    self.game.emit_event("online_meteor_created", {
+        "meteor_id": meteor_created_data.meteor_id,
+        "type": meteor_created_data.meteor_type,
+        "x": position.x,
+        "y": position.y,
+        "angle": meteor_created_data.angle,
+        "rotation_speed": meteor_created_data.rotation_speed,
+        "speed_x": velocity.x,
+        "speed_y": velocity.y
+    })
+\end{lstlisting}
+
+\subsubsection{Predicción y Reconciliación}
+
+Para proporcionar una experiencia fluida a pesar de la latencia de red, el cliente implementa técnicas de predicción local y reconciliación:
+
+\begin{itemize}
+    \item \textbf{Predicción de movimiento}: El jugador local se mueve inmediatamente en respuesta a las entradas del usuario, sin esperar confirmación del servidor.
+    
+    \item \textbf{Interpolación}: Para los jugadores remotos, se implementa interpolación suave entre las posiciones recibidas del servidor para evitar movimientos bruscos.
+    
+    \item \textbf{Extrapolación}: En caso de pérdida de paquetes o alta latencia, se predice la posición futura de los jugadores remotos basándose en su velocidad actual.
+    
+    \item \textbf{Reconciliación}: Cuando se recibe una actualización del servidor que contradice el estado local, se aplica una corrección suave para evitar saltos visibles.
+\end{itemize}
+
+\begin{lstlisting}[language=python, caption=Implementación de interpolación para jugadores remotos]
+class OtherPlayer:
+    """Representa un jugador remoto en el cliente."""
+    
+    def update(self, delta_time):
+        # Interpolación suave hacia la posición objetivo
+        if self.target_position:
+            # Calcular factor de interpolación
+            self.lerp_factor += self.lerp_speed * delta_time
+            if self.lerp_factor > 1.0:
+                self.lerp_factor = 1.0
+            
+            # Interpolar posición
+            dx = self.target_position[0] - self.x
+            dy = self.target_position[1] - self.y
+            self.x += dx * self.lerp_factor
+            self.y += dy * self.lerp_factor
+            
+            # Actualizar velocidad para extrapolación
+            self.speed_x = dx * self.lerp_speed
+            self.speed_y = dy * self.lerp_speed
+        else:
+            # Extrapolación basada en velocidad cuando no hay actualizaciones
+            self.x += self.speed_x * delta_time
+            self.y += self.speed_y * delta_time
+\end{lstlisting}
+
+\subsubsection{Ciclo de Vida del Cliente}
+
+El ciclo de vida del cliente sigue estos pasos:
+
+\begin{enumerate}
+    \item \textbf{Inicialización}: Carga de recursos, configuración y creación de componentes.
+    \item \textbf{Conexión al servidor}: Establecimiento de conexión y autenticación.
+    \item \textbf{Solicitud de estado inicial}: Obtención del estado actual del juego.
+    \item \textbf{Suscripción a eventos}: Establecimiento del stream de eventos.
+    \item \textbf{Bucle principal}: Procesamiento de entradas, actualización y renderizado.
+    \item \textbf{Sincronización}: Envío periódico de estado y procesamiento de eventos recibidos.
+    \item \textbf{Desconexión}: Notificación al servidor y liberación de recursos al salir.
+\end{enumerate}
+
+Esta arquitectura orientada a componentes con comunicación basada en eventos permite una clara separación de responsabilidades entre la lógica del juego, la renderización y la comunicación de red, facilitando la adaptación del juego original para soportar funcionalidades multijugador.
+
+\section{Interfaces de Comunicación: Protocol Buffers}
+
+La comunicación entre el cliente Python y el servidor Go se realiza mediante gRPC con Protocol Buffers, que proporciona una definición clara y eficiente de las interfaces. El archivo \texttt{game.proto} define todos los mensajes y servicios necesarios para la comunicación entre cliente y servidor.
+
+\subsection{Estructura del Archivo Proto}
+
+El archivo \texttt{game.proto} está estructurado en tres partes principales:
+
+\begin{enumerate}
+    \item \textbf{Definición de tipos básicos}: Estructuras de datos fundamentales como vectores y posiciones.
+    \item \textbf{Definición de mensajes de eventos}: Estructuras para cada tipo de evento del juego.
+    \item \textbf{Definición de servicios}: Interfaces RPC que expone el servidor.
+\end{enumerate}
+
+A continuación se muestra la estructura completa del archivo proto:
+
+\begin{lstlisting}[language=proto, caption=Estructura del archivo game.proto]
+syntax = "proto3";
+
+package space_shooter;
+option go_package = "github.com/user/space_shooter/proto";
+
+// Tipos básicos
+message Vector2 {
+  float x = 1;
+  float y = 2;
+}
+
+// Mensajes de solicitud y respuesta
+message ConnectRequest {
+  string player_name = 1;
+}
+
+message ConnectResponse {
+  bool success = 1;
+  string player_id = 2;
+  string error_message = 3;
+}
+
+// Eventos del juego
+message GameEvent {
+  string event_type = 1;
+  oneof event_data {
+    PlayerConnectEvent player_connect = 2;
+    PlayerDisconnectEvent player_disconnect = 3;
+    PlayerPositionEvent player_position = 4;
+    MeteorCreatedEvent meteor_created = 5;
+    MeteorDestroyedEvent meteor_destroyed = 6;
+    PlayerShotEvent player_shot = 7;
+    ScoreUpdateEvent score_update = 8;
+  }
+}
+
+// Servicios
+service GameService {
+  rpc Connect(ConnectRequest) returns (ConnectResponse);
+  rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+  rpc UpdatePosition(PositionUpdate) returns (UpdateResponse);
+  rpc FireShot(ShotRequest) returns (UpdateResponse);
+  rpc SubscribeToEvents(EventsRequest) returns (stream EventNotification);
+}
+\end{lstlisting}
+
+\subsection{Tipos de Datos Fundamentales}
+
+Los tipos de datos básicos proporcionan las estructuras fundamentales para representar elementos del juego:
+
+\begin{lstlisting}[language=proto, caption=Definición de tipos básicos]
+// Vector bidimensional para posiciones y velocidades
+message Vector2 {
+  float x = 1;
+  float y = 2;
+}
+
+// Información básica del jugador
+message PlayerInfo {
+  string player_id = 1;
+  string player_name = 2;
+  Vector2 position = 3;
+  float rotation = 4;
+  int32 score = 5;
+  int32 lives = 6;
+}
+
+// Información básica de un meteorito
+message MeteorInfo {
+  string meteor_id = 1;
+  int32 meteor_type = 2;
+  Vector2 position = 3;
+  Vector2 velocity = 4;
+  float rotation = 5;
+  float rotation_speed = 6;
+  int32 health = 7;
+  float radius = 8;
+}
+\end{lstlisting}
+
+Estos tipos permiten una serialización eficiente de los datos del juego y garantizan la compatibilidad entre el cliente Python y el servidor Go.
+
+\subsection{Eventos del Juego}
+
+Los eventos del juego se modelan como un mensaje genérico \texttt{GameEvent} con un campo discriminador \texttt{event\_type} y un campo de datos específico del evento utilizando \texttt{oneof}:
+
+\begin{lstlisting}[language=proto, caption=Definición de eventos del juego]
+message GameEvent {
+  string event_type = 1;
+  oneof event_data {
+    PlayerConnectEvent player_connect = 2;
+    PlayerDisconnectEvent player_disconnect = 3;
+    PlayerPositionEvent player_position = 4;
+    MeteorCreatedEvent meteor_created = 5;
+    MeteorDestroyedEvent meteor_destroyed = 6;
+    PlayerShotEvent player_shot = 7;
+    ScoreUpdateEvent score_update = 8;
+  }
+}
+
+message PlayerConnectEvent {
+  PlayerInfo player = 1;
+}
+
+message PlayerDisconnectEvent {
+  string player_id = 1;
+}
+
+message PlayerPositionEvent {
+  string player_id = 1;
+  Vector2 position = 2;
+  float rotation = 3;
+}
+
+message MeteorCreatedEvent {
+  string meteor_id = 1;
+  int32 meteor_type = 2;
+  Vector2 position = 3;
+  Vector2 velocity = 4;
+  float angle = 5;
+  float rotation_speed = 6;
+}
+
+message MeteorDestroyedEvent {
+  string meteor_id = 1;
+  string destroyed_by = 2;
+  int32 points_awarded = 3;
+}
+
+message PlayerShotEvent {
+  string player_id = 1;
+  string shot_id = 2;
+  Vector2 position = 3;
+  Vector2 velocity = 4;
+  float angle = 5;
+}
+
+message ScoreUpdateEvent {
+  string player_id = 1;
+  int32 new_score = 2;
+}
+\end{lstlisting}
+
+Esta estructura permite una comunicación eficiente y extensible, ya que nuevos tipos de eventos pueden añadirse fácilmente sin romper la compatibilidad con clientes existentes.
+
+\subsection{Servicios RPC}
+
+El servicio principal \texttt{GameService} define las operaciones que los clientes pueden invocar en el servidor:
+
+\begin{lstlisting}[language=proto, caption=Definición del servicio GameService]
+service GameService {
+  // Conexión y autenticación
+  rpc Connect(ConnectRequest) returns (ConnectResponse);
+  rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+  
+  // Actualizaciones de estado
+  rpc UpdatePosition(PositionUpdate) returns (UpdateResponse);
+  rpc FireShot(ShotRequest) returns (UpdateResponse);
+  
+  // Suscripción a eventos
+  rpc SubscribeToEvents(EventsRequest) returns (stream EventNotification);
+  
+  // Obtención de estado inicial
+  rpc GetGameState(GameStateRequest) returns (GameStateResponse);
+}
+\end{lstlisting}
+
+Las operaciones se dividen en cuatro categorías principales:
+
+\begin{enumerate}
+    \item \textbf{Operaciones de conexión}: Permiten a los jugadores unirse y abandonar el juego.
+    \item \textbf{Actualizaciones de estado}: Permiten a los clientes informar al servidor sobre acciones del jugador.
+    \item \textbf{Suscripción a eventos}: Establece un stream bidireccional para recibir notificaciones del servidor.
+    \item \textbf{Consulta de estado}: Permite a los clientes obtener el estado actual del juego al conectarse.
+\end{enumerate}
+
+\subsection{Mensajes de Solicitud y Respuesta}
+
+Para cada operación RPC, se definen mensajes específicos de solicitud y respuesta:
+
+\begin{lstlisting}[language=proto, caption=Mensajes de solicitud y respuesta]
+// Conexión
+message ConnectRequest {
+  string player_name = 1;
+}
+
+message ConnectResponse {
+  bool success = 1;
+  string player_id = 2;
+  string error_message = 3;
+}
+
+// Desconexión
+message DisconnectRequest {
+  string player_id = 1;
+}
+
+message DisconnectResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Actualización de posición
+message PositionUpdate {
+  string player_id = 1;
+  Vector2 position = 2;
+  float rotation = 3;
+}
+
+// Solicitud de disparo
+message ShotRequest {
+  string player_id = 1;
+  Vector2 position = 2;
+  Vector2 direction = 3;
+  float angle = 4;
+}
+
+// Respuesta genérica para actualizaciones
+message UpdateResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Solicitud de suscripción a eventos
+message EventsRequest {
+  string player_id = 1;
+}
+
+// Notificación de evento
+message EventNotification {
+  GameEvent event = 1;
+  int64 timestamp = 2;
+  int32 sequence_number = 3;
+}
+
+// Solicitud de estado del juego
+message GameStateRequest {
+  string player_id = 1;
+}
+
+// Respuesta con estado completo del juego
+message GameStateResponse {
+  repeated PlayerInfo players = 1;
+  repeated MeteorInfo meteors = 2;
+  repeated ShotInfo shots = 3;
+  int64 server_time = 4;
+}
+\end{lstlisting}
+
+\subsection{Generación de Código}
+
+A partir de esta definición de Protocol Buffers, se genera código tanto para Go como para Python:
+
+\begin{lstlisting}[language=bash, caption=Comandos para generar código a partir del archivo proto]
+# Generación de código Go
+protoc --go_out=. --go-grpc_out=. game.proto
+
+# Generación de código Python
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. game.proto
+\end{lstlisting}
+
+El código generado proporciona:
+
+\begin{itemize}
+    \item \textbf{Estructuras de datos}: Clases para representar los mensajes definidos.
+    \item \textbf{Serialización/deserialización}: Métodos para convertir entre objetos y bytes.
+    \item \textbf{Stubs de cliente}: Clases para invocar operaciones RPC en el servidor.
+    \item \textbf{Interfaces de servidor}: Interfaces para implementar el servicio en el servidor.
+\end{itemize}
+
+\subsection{Ventajas de Protocol Buffers y gRPC}
+
+La elección de Protocol Buffers y gRPC para la comunicación cliente-servidor ofrece varias ventajas:
+
+\begin{itemize}
+    \item \textbf{Definición clara de interfaces}: El archivo proto actúa como un contrato entre cliente y servidor.
+    \item \textbf{Serialización eficiente}: Los mensajes se codifican en un formato binario compacto.
+    \item \textbf{Generación automática de código}: Reduce errores y garantiza compatibilidad.
+    \item \textbf{Soporte para streaming}: Permite comunicación en tiempo real mediante streams bidireccionales.
+    \item \textbf{Interoperabilidad}: Facilita la comunicación entre diferentes lenguajes (Python y Go).
+    \item \textbf{Evolución compatible}: Permite añadir nuevos campos sin romper clientes existentes.
+\end{itemize}
+
+\subsection{Flujo de Comunicación}
+
+El flujo típico de comunicación entre cliente y servidor utilizando estas interfaces es:
+
+\begin{enumerate}
+    \item El cliente se conecta al servidor mediante \texttt{Connect()}.
+    \item El cliente establece un stream de eventos mediante \texttt{SubscribeToEvents()}.
+    \item El cliente solicita el estado actual del juego mediante \texttt{GetGameState()}.
+    \item Durante el juego, el cliente envía actualizaciones de posición mediante \texttt{UpdatePosition()}.
+    \item El cliente envía acciones de disparo mediante \texttt{FireShot()}.
+    \item El servidor envía eventos a través del stream establecido.
+    \item Al salir, el cliente notifica al servidor mediante \texttt{Disconnect()}.
+\end{enumerate}
+
+Este protocolo bien definido permite una comunicación eficiente y robusta entre el cliente Python y el servidor Go, facilitando la implementación del sistema multijugador.
+
+\section{Pruebas – Ejecución}
+
+Las pruebas del sistema multijugador se dividieron en varias etapas para garantizar su correcto funcionamiento:
+
+\subsection{Pruebas Unitarias}
+
+Se realizaron pruebas unitarias para verificar el funcionamiento correcto de componentes individuales:
+
+\begin{itemize}
+    \item \textbf{Serialización/deserialización}: Verificación de la correcta conversión de datos entre los formatos de Python y Go.
+    \item \textbf{Gestión de eventos}: Pruebas del sistema de eventos para asegurar la correcta propagación de notificaciones.
+    \item \textbf{Lógica de juego}: Validación de la física de movimiento, colisiones y generación de meteoritos.
+\end{itemize}
+
+\subsection{Pruebas de Integración}
+
+Las pruebas de integración se enfocaron en la comunicación entre cliente y servidor:
+
+\begin{itemize}
+    \item \textbf{Conexión y desconexión}: Verificación del proceso de unirse y abandonar una partida.
+    \item \textbf{Sincronización de estado}: Comprobación de que todos los clientes mantienen un estado coherente.
+    \item \textbf{Propagación de eventos}: Validación de que los eventos generados por un cliente se reflejan correctamente en los demás.
+\end{itemize}
+
+\subsection{Pruebas de Carga}
+
+Para evaluar la escalabilidad del sistema, se realizaron pruebas con múltiples clientes simultáneos:
+
+\begin{itemize}
+    \item \textbf{Rendimiento con 2-4 jugadores}: El sistema mantuvo un rendimiento óptimo con hasta 4 jugadores simultáneos.
+    \item \textbf{Escenarios de alta actividad}: Se probaron situaciones con gran cantidad de meteoritos y disparos frecuentes.
+    \item \textbf{Monitoreo de recursos}: Se midió el uso de CPU y memoria en el servidor durante las pruebas.
+\end{itemize}
+
+\subsection{Pruebas de Latencia}
+
+Para simular condiciones de red reales, se realizaron pruebas con diferentes niveles de latencia:
+
+\begin{itemize}
+    \item \textbf{Latencia baja (50-100ms)}: El juego mantuvo una experiencia fluida sin ajustes significativos.
+    \item \textbf{Latencia media (100-200ms)}: La predicción local compensó adecuadamente los retrasos.
+    \item \textbf{Latencia alta (200-500ms)}: Se observaron algunas correcciones visibles, pero el juego seguía siendo jugable.
+\end{itemize}
+
+Los resultados de las pruebas demostraron que el sistema es capaz de proporcionar una experiencia multijugador satisfactoria en condiciones normales de red, con degradación gradual en situaciones de latencia extrema.
+
+\section{Conclusiones}
+
+La implementación de un sistema multijugador para Space Shooter representa un avance significativo en la evolución del juego, transformándolo de una experiencia individual a una colaborativa. Este proyecto ha demostrado los siguientes puntos clave:
+
+\begin{itemize}
+    \item \textbf{Arquitectura efectiva}: La arquitectura cliente-servidor ha demostrado ser efectiva para sincronizar el estado del juego entre múltiples jugadores, proporcionando una base sólida para la experiencia multijugador.
+    
+    \item \textbf{Comunicación eficiente}: gRPC y Protocol Buffers han proporcionado un mecanismo de comunicación eficiente y tipado entre Python y Go, facilitando la interoperabilidad entre lenguajes diferentes.
+    
+    \item \textbf{Separación de responsabilidades}: La clara separación entre la lógica del juego y la presentación ha facilitado la implementación multijugador, permitiendo que el servidor actúe como autoridad mientras los clientes se centran en la experiencia del usuario.
+    
+    \item \textbf{Rendimiento adecuado}: La elección de Go para el servidor ha demostrado ser acertada, proporcionando un rendimiento sólido incluso con múltiples clientes conectados gracias a su eficiente manejo de la concurrencia.
+    
+    \item \textbf{Experiencia de juego mejorada}: La modalidad multijugador ha enriquecido significativamente la experiencia de juego, permitiendo la cooperación entre jugadores y añadiendo una nueva dimensión social al juego.
+\end{itemize}
+
+El proyecto también ha identificado áreas de mejora para futuras iteraciones:
+
+\begin{itemize}
+    \item \textbf{Predicción avanzada}: Implementar algoritmos más sofisticados de predicción de movimiento para reducir aún más el impacto de la latencia.
+    
+    \item \textbf{Optimización de red}: Reducir el tráfico mediante técnicas como compresión delta y agrupación de mensajes (batching).
+    
+    \item \textbf{Escalabilidad}: Implementar soporte para múltiples salas de juego simultáneas y un sistema de emparejamiento.
+    
+    \item \textbf{Persistencia}: Añadir un sistema de perfiles de jugador con estadísticas y progresión persistentes.
+    
+    \item \textbf{Modos de juego adicionales}: Desarrollar modos competitivos y cooperativos que aprovechen la infraestructura multijugador.
+\end{itemize}
+
+En conclusión, este proyecto ha logrado transformar exitosamente Space Shooter en un juego multijugador cooperativo, demostrando que es posible adaptar juegos monolíticos existentes a arquitecturas distribuidas con las tecnologías adecuadas. La combinación de Python, Go y gRPC ha proporcionado un equilibrio óptimo entre facilidad de desarrollo, rendimiento y capacidad de comunicación, sentando las bases para futuras mejoras y expansiones del juego.
+
+\section{Bibliografía}
+
+\begin{enumerate}
+    \item Pygame Community. (2023). Pygame Documentation. \url{https://www.pygame.org/docs/}
+    \item The Go Authors. (2023). The Go Programming Language. \url{https://golang.org/doc/}
+    \item gRPC Authors. (2023). gRPC Documentation. \url{https://grpc.io/docs/}
+    \item Protocol Buffers. (2023). Protocol Buffers Developer Guide. \url{https://developers.google.com/protocol-buffers/docs/overview}
+    \item Fiedler, G. (2010). What Every Programmer Needs To Know About Game Networking. \url{https://gafferongames.com/post/what_every_programmer_needs_to_know_about_game_networking/}
+    \item Glazer, J., & Madhav, S. (2015). Multiplayer Game Programming: Architecting Networked Games (1st ed.). Addison-Wesley Professional.
+    \item Aldridge, D. (2011). I Shot You First: Networking the Gameplay of HALO: REACH. Game Developers Conference. \url{https://www.gdcvault.com/play/1014345/I-Shot-You-First-Networking}
+    \item Bernier, Y. W. (2001). Latency Compensating Methods in Client/Server In-game Protocol Design and Optimization. Game Developers Conference. \url{https://developer.valvesoftware.com/wiki/Latency_Compensating_Methods_in_Client/Server_In-game_Protocol_Design_and_Optimization}
+\end{enumerate}
+
+\end{document} 
