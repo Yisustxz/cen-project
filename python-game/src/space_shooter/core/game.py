@@ -470,3 +470,34 @@ class SpaceShooterGame(GameEngine):
             
             if not player_found:
                 print(f"Advertencia: No se encontró al jugador {data['player_id']} para crear su misil")
+
+    def on_online_meteor_destroyed(self, data):
+        """
+        Maneja el evento cuando un meteorito es destruido en el servidor.
+        
+        Args:
+            data: Datos del evento con meteor_id y player_id
+        """
+        if 'meteor_id' in data:
+            meteor_id = data['meteor_id']
+            player_id = data.get('player_id', 0)
+            
+            print(f"Recibido evento de meteorito destruido: ID {meteor_id}")
+            
+            # Buscar el meteorito por su ID
+            meteors = self.objects_manager.get_objects_by_type("meteor")
+            for meteor in meteors:
+                if hasattr(meteor, 'network_id') and meteor.network_id == meteor_id:
+                    # Eliminar el meteorito del motor
+                    self.unregister_object(meteor)
+                    
+                    # Si fue destruido por un jugador (player_id > 0), mostrar mensaje
+                    if player_id > 0:
+                        print(f"Meteorito {meteor_id} destruido por jugador {player_id}")
+                    else:
+                        print(f"Meteorito {meteor_id} destruido (salió de la pantalla)")
+                    
+                    return
+            
+            # Si llegamos aquí, no se encontró el meteorito
+            print(f"Advertencia: No se encontró el meteorito con ID {meteor_id} para destruir")

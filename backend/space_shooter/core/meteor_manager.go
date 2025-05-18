@@ -220,6 +220,10 @@ func (mm *MeteorManager) checkMeteorsOutOfBounds() {
 				fmt.Sprintf("[METEOR REMOVED] ID: %d, Type: %s, Position: (%.2f, %.2f), Level Height: %.2f", 
 				meteor.GetID(), meteor.MeteorType, meteor.Position.X, meteor.Position.Y, levelHeight))
 			
+			// Notificar a los clientes que el meteorito fue destruido (salió de la pantalla)
+			// Usamos playerID=0 para indicar que no fue destruido por un jugador
+			mm.game.BroadcastMeteorDestroyed(meteor.GetID(), 0)
+			
 			// Eliminar del motor
 			mm.game.UnregisterObject(meteor.GetID())
 			meteorRemoved++
