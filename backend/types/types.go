@@ -2,6 +2,7 @@ package types
 
 import (
 	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -42,4 +43,12 @@ type GameServer struct {
 	StateMutex    sync.RWMutex         // Mutex para acceder al estado del juego
 	Logger        Logger               // Logger para registrar mensajes
 	Output        io.Writer            // Salida para los mensajes de log
+}
+
+// Shutdown detiene el servidor de juego por un error crítico
+func (s *GameServer) Shutdown() {
+	s.Logger.LogMessage("SHUTDOWN: Deteniendo el servidor por un error crítico")
+	// Aquí se puede implementar la lógica para detener el servidor
+	// Por ahora, solo registramos el mensaje
+	os.Exit(1) // Termina el programa con código de error
 } 

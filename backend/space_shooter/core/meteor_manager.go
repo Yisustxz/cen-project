@@ -1,15 +1,20 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sync"
 	"time"
+	"os"
 
-	"github.com/Yisustxz/cen-project/backend/engine"
 	"github.com/Yisustxz/cen-project/backend/internal/service"
 	"github.com/Yisustxz/cen-project/backend/space_shooter/entities"
+	"github.com/Yisustxz/cen-project/backend/config"
 )
+
+// Constante para controlar la depuración detallada
+const showDetailedConfigDebug = false
 
 // MeteorManager gestiona la creación y eliminación de meteoritos
 type MeteorManager struct {
@@ -32,13 +37,42 @@ func (mm *MeteorManager) GetGame() *Game {
 
 // NewMeteorManager crea un nuevo gestor de meteoritos
 func NewMeteorManager(game *Game) *MeteorManager {
+	// Obtener la configuración global
+	gameConfig, err := config.LoadConfig()
+	
+	var levelWidth, levelHeight int
+	var maxMeteors int
+	var spawnFrequency float64
+	
+	// Si hay error o no hay configuración, usar valores por defecto
+	if err != nil || gameConfig == nil {
+		// Falla
+		fmt.Printf("[METEOR MANAGER] Error: %v\n", err)
+		os.Exit(1)
+
+		game.gameServer.Logger.LogError("Error cargando configuración, usando valores por defecto", err)
+	} else {
+		// Obtener dimensiones del nivel desde la configuración
+		levelWidth, levelHeight = config.GetLevelDimensions(gameConfig.Config)
+		
+		// Obtener valores de configuración para meteoros
+		maxMeteors = config.GetMaxMeteors()
+		game.gameServer.Logger.LogMessage(
+			fmt.Sprintf("------------>[METEOR MANAGER] Max Meteoros: %d", maxMeteors))
+		spawnFrequency = config.GetMeteorSpawnFrequency()
+		
+		game.gameServer.Logger.LogMessage(
+			fmt.Sprintf("Configuración cargada: Nivel %dx%d, Max Meteoros: %d, Frecuencia: %.1fs",
+				levelWidth, levelHeight, maxMeteors, spawnFrequency))
+	}
+	
 	return &MeteorManager{
 		game:           game,
-		spawnFrequency: 2 * time.Second,  // Cada 2 segundos por defecto
+		spawnFrequency: time.Duration(spawnFrequency * float64(time.Second)),
 		lastSpawn:      time.Now().Add(-2 * time.Second), // Para que cree uno inmediatamente
-		levelWidth:     800,              // Ancho del nivel
-		levelHeight:    600,              // Alto del nivel
-		maxMeteors:     2,               // Máximo 10 meteoritos a la vez
+		levelWidth:     float32(levelWidth),
+		levelHeight:    float32(levelHeight),
+		maxMeteors:     maxMeteors,
 		enabled:        true,             // Habilitado por defecto
 		meteorCategory: "",               // Todos los tipos
 		meteorsCreated: 0,
@@ -105,7 +139,6 @@ func (mm *MeteorManager) Update() {
 	maxMeteors := mm.maxMeteors
 	spawnFrequency := mm.spawnFrequency
 	lastSpawn := mm.lastSpawn
-	category := mm.meteorCategory
 	mm.mutex.Unlock()
 	
 	// Si está deshabilitado, no hacer nada
@@ -113,26 +146,32 @@ func (mm *MeteorManager) Update() {
 		return
 	}
 	
+	// Verificar si es tiempo de crear un nuevo meteorito
+	timeSinceLastSpawn := time.Since(lastSpawn)
+
 	// Loguear cada 100 actualizaciones (reducido para no saturar)
 	if mm.game.updateCounter % 100 == 0 {
 		mm.game.gameServer.Logger.LogMessage(
-			fmt.Sprintf("[METEOR MANAGER] Estado - Enabled: %v, Frequency: %v",
-				enabled, spawnFrequency))
+			fmt.Sprintf("[METEOR MANAGER] Estado - Enabled: %v, Frequency: %v, timeSinceLastSpawn: %v",
+				enabled, spawnFrequency, timeSinceLastSpawn))
 	}
-	
-	// Verificar si es tiempo de crear un nuevo meteorito
-	timeSinceLastSpawn := time.Since(lastSpawn)
+
 	if timeSinceLastSpawn >= spawnFrequency {
+		mm.game.gameServer.Logger.LogMessage(
+			fmt.Sprintf("[METEOR MANAGER] Tiempo para crear un nuevo meteorito: %v", timeSinceLastSpawn))
+
 		// Contar meteoritos actuales
 		meteors := mm.game.GetObjectsByType("meteor")
 		meteorCount := len(meteors)
-		
+
+		mm.game.gameServer.Logger.LogMessage(
+			fmt.Sprintf("[METEOR MANAGER] Meteoros actuales: %d, maxMeteors: %d", meteorCount, maxMeteors))
+
 		// Si hay menos meteoritos que el máximo, crear uno nuevo
 		if meteorCount < maxMeteors {
 			// Crear un meteorito - el logging se hace dentro de CreateMeteor
-			meteorType := entities.GetRandomMeteorType(category)
-			createdMeteor := mm.CreateMeteor(meteorType, nil)
-			
+			createdMeteor := mm.CreateMeteor()
+
 			// Incrementar contador si se creó correctamente
 			if createdMeteor != nil {
 				mm.mutex.Lock()
@@ -190,33 +229,64 @@ func (mm *MeteorManager) checkMeteorsOutOfBounds() {
 	// Log adicional si se eliminaron meteoritos en esta actualización
 	if meteorRemoved > 0 {
 		mm.game.gameServer.Logger.LogMessage(
-			fmt.Sprintf("[METEOR REMOVAL] Elimiados %d meteoritos en este tick", meteorRemoved))
+			fmt.Sprintf("[METEOR REMOVAL] Eliminados %d meteoritos en este tick", meteorRemoved))
 	}
 }
 
 // CreateMeteor crea un nuevo meteorito
-func (mm *MeteorManager) CreateMeteor(meteorType string, position *engine.Vector2D) *entities.Meteor {
+func (mm *MeteorManager) CreateMeteor() *entities.Meteor {
+
+	gameConfig, err := config.LoadConfig()
+	if err != nil {
+		mm.game.gameServer.Logger.LogError("Error al cargar configuración para crear meteorito", err)
+		// Apaga el servidor por error crítico
+		mm.game.gameServer.Shutdown()
+		return nil
+	}
+
+	// Mostrar la configuración en formato JSON legible solo si la depuración detallada está activada
+	if showDetailedConfigDebug {
+		configJson, err := json.MarshalIndent(gameConfig, "", "  ")
+		if err != nil {
+			mm.game.gameServer.Logger.LogError("Error serializando configuración a JSON", err)
+		} else {
+			mm.game.gameServer.Logger.LogMessage(
+				fmt.Sprintf("[METEOR MANAGER] Configuración cargada (JSON): %s", string(configJson)))
+		}
+	}
+
+	// Si no se especifica tipo, elegir uno aleatorio
+	meteorType := config.GetMeteorTypeFromCategory(gameConfig.EntityConfig)
+	
+	// Si no hay tipos disponibles, salir
+	if meteorType == "" {
+		mm.game.gameServer.Logger.LogError("No se pudo obtener un tipo de meteorito", nil)
+		// Apaga el servidor por error crítico
+		mm.game.gameServer.Shutdown()
+		return nil
+	}
+	
+	// Obtener configuración para este tipo de meteorito
+	meteorConfig := config.GetMeteorConfig(gameConfig.EntityConfig, meteorType)
+	if meteorConfig == nil {
+		mm.game.gameServer.Logger.LogError(
+			fmt.Sprintf("No se encontró configuración para el tipo: %s", meteorType), nil)
+		// Apaga el servidor por error crítico
+		mm.game.gameServer.Shutdown()
+		return nil
+	}
+	
 	mm.mutex.Lock()
 	levelWidth := mm.levelWidth
 	mm.mutex.Unlock()
 	
-	// Si no se especifica tipo, elegir uno aleatorio
-	if meteorType == "" {
-		meteorType = entities.GetRandomMeteorType(mm.meteorCategory)
-	}
-	
 	// Si no se especifica posición, generar una aleatoria
 	var x, y float32
-	if position != nil {
-		x = position.X
-		y = position.Y
-	} else {
-		x = rand.Float32() * levelWidth
-		y = -50 // Iniciar fuera de la pantalla, arriba
-	}
+	x = rand.Float32() * levelWidth
+	y = -50 // Iniciar fuera de la pantalla, arriba
 	
-	// Crear meteorito
-	meteor := entities.NewMeteor(x, y, meteorType)
+	// Usar la configuración para establecer las propiedades del meteorito
+	meteor := entities.NewMeteorFromConfig(x, y, meteorType, meteorConfig)
 	
 	// Registrar en el motor del juego
 	objID := mm.game.RegisterObject(meteor)
@@ -297,8 +367,3 @@ func (mm *MeteorManager) GetMeteorsProto() *service.MeteorList {
 		Meteors: meteorList,
 	}
 }
-
-// GetRandomMeteorTypeOfCategory obtiene un tipo de meteorito aleatorio de una categoría específica
-func (mm *MeteorManager) GetRandomMeteorTypeOfCategory(category string) string {
-	return entities.GetRandomMeteorType(category)
-} 

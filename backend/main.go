@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -21,8 +22,8 @@ func main() {
 	}
 
 	// Obtener dirección del servidor
-	serverAddress := config.GetServerAddress(conf)
-
+	ip, port := config.GetServerAddress(conf.Config)
+	serverAddress := fmt.Sprintf("%s:%d", ip, port)
 	// Crear instancia del servidor
 	gameServer := &types.GameServer{
 		Players:      make(map[int32]*types.Player),

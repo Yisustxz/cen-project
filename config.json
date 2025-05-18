@@ -27,6 +27,9 @@
     "ip": "localhost",
     "port": 9090,
     "debug": true,
-    "maxPlayers": 4
+    "maxPlayers": 4,
+    "maxMeteors": 2,
+    "meteorSpawnFrequency": 1.0,
+    "initialMeteorCount": 3
   }
 }

@@ -1,156 +1,149 @@
 package entities
 
 import (
+	"fmt"
 	"math/rand"
 
+	"github.com/Yisustxz/cen-project/backend/config"
 	"github.com/Yisustxz/cen-project/backend/engine"
 )
 
 // Meteor representa un meteorito en el juego
 type Meteor struct {
 	engine.BaseGameObject
-	MeteorType     string
-	Size           float32
-	Rotation       float32
-	RotationSpeed  float32
-	Health         int
+	MeteorType     string   // Tipo de meteorito (brown_big_1, grey_small_2, etc.)
+	Size           float32  // Tamaño del meteorito
+	Rotation       float32  // Rotación actual
+	RotationSpeed  float32  // Velocidad de rotación
+	Health         int      // Puntos de vida
 	Points         int      // Puntos que otorga al ser destruido
 	DestroyedBy    int32    // ID del jugador que destruyó el meteorito
 }
 
-// MeteorTypes contiene los tipos de meteoritos disponibles
-// Estos coinciden con los tipos definidos en el frontend
-var MeteorTypes = []string{
-	"brown_big_1", "brown_big_2", 
-	"brown_medium_1", "brown_medium_2", 
-	"brown_small_1", "brown_small_2", 
-	"brown_tiny_1", "brown_tiny_2",
-	"grey_big_1", "grey_big_2", 
-	"grey_medium_1", "grey_medium_2", 
-	"grey_small_1", "grey_small_2", 
-	"grey_tiny_1", "grey_tiny_2",
-}
-
-// Categorías de meteoritos agrupadas por tamaño
-var MeteorCategories = map[string][]string{
-	"big": {"brown_big_1", "brown_big_2", "grey_big_1", "grey_big_2"},
-	"medium": {"brown_medium_1", "brown_medium_2", "grey_medium_1", "grey_medium_2"},
-	"small": {"brown_small_1", "brown_small_2", "grey_small_1", "grey_small_2"},
-	"tiny": {"brown_tiny_1", "brown_tiny_2", "grey_tiny_1", "grey_tiny_2"},
-}
-
-// GetRandomMeteorType devuelve un tipo de meteorito aleatorio, opcionalmente de una categoría específica
-func GetRandomMeteorType(category string) string {
-	if category != "" {
-		if types, ok := MeteorCategories[category]; ok {
-			return types[rand.Intn(len(types))]
-		}
-	}
-	return MeteorTypes[rand.Intn(len(MeteorTypes))]
-}
-
-// NewMeteor crea un nuevo meteorito
+// NewMeteor crea un nuevo meteorito con valores por defecto
 func NewMeteor(x, y float32, meteorType string) *Meteor {
-	// Si no se especifica tipo, elegir uno aleatorio
-	if meteorType == "" {
-		meteorType = GetRandomMeteorType("")
-	}
+	// Valores por defecto
+	speedX := float32(rand.Float64()*0.8) - 0.4  // Velocidad en X (-0.4 a 0.4)
+	speedY := float32(0.5 + rand.Float64()*1.0)  // Velocidad en Y (0.5 a 1.5)
+	rotSpeed := float32(rand.Float64()*0.02 + 0.01) // Velocidad de rotación
+	size := float32(32) // Tamaño por defecto, luego se ajusta
+	hp := 1  // Puntos de vida por defecto
+	points := 10 // Puntos por defecto
+
+	// Ajustar según el tipo
+	switch {
+	case meteorType == "":
+		meteorType = "brown_big_1" // Por defecto
 	
+	// Tipos grandes
+	case meteorType == "brown_big_1", meteorType == "brown_big_2", 
+	     meteorType == "grey_big_1", meteorType == "grey_big_2":
+		size = 64
+		hp = 3
+		points = 30
+		speedY = float32(0.3 + rand.Float64()*0.5) // Más lento para los grandes
+	
+	// Tipos medianos
+	case meteorType == "brown_medium_1", meteorType == "brown_medium_2", 
+	     meteorType == "grey_medium_1", meteorType == "grey_medium_2":
+		size = 32
+		hp = 2
+		points = 20
+		speedY = float32(0.4 + rand.Float64()*0.6)
+	
+	// Tipos pequeños
+	case meteorType == "brown_small_1", meteorType == "brown_small_2", 
+	     meteorType == "grey_small_1", meteorType == "grey_small_2":
+		size = 16
+		hp = 1
+		points = 10
+		speedY = float32(0.6 + rand.Float64()*0.8)
+	
+	// Tipos diminutos
+	case meteorType == "brown_tiny_1", meteorType == "brown_tiny_2", 
+	     meteorType == "grey_tiny_1", meteorType == "grey_tiny_2":
+		size = 8
+		hp = 1 
+		points = 5
+		speedY = float32(0.7 + rand.Float64()*1.0) // Más rápido para los pequeños
+	}
+
+	// Crear meteorito
 	m := &Meteor{
 		BaseGameObject: engine.BaseGameObject{
 			Type: "meteor",
 			Position: engine.Vector2D{X: x, Y: y},
+			Velocity: engine.Vector2D{X: speedX, Y: speedY},
 		},
 		MeteorType:    meteorType,
-		Rotation:      rand.Float32() * 360,
+		Size:          size,
+		Rotation:      0,
+		RotationSpeed: rotSpeed,
+		Health:        hp,
+		Points:        points,
 		DestroyedBy:   -1, // -1 significa que no ha sido destruido
 	}
-	
-	// Factor de reducción de velocidad para hacer más lento el movimiento
-	const velocityReductionFactor = 1
-	
-	// Configurar según tipo - basado en entities_config.json
-	if isBigMeteor(meteorType) {
-		m.Size = 48
-		m.Health = 3
-		m.Points = 100
-		m.RotationSpeed = (rand.Float32() * 240) - 120 // Entre -120 y 120
-		m.Velocity = engine.Vector2D{
-			X: ((rand.Float32() * 120) - 60) * velocityReductionFactor,    // Entre -60 y 60
-			Y: (60 + (rand.Float32() * 120)) * velocityReductionFactor,    // Entre 60 y 180
-		}
-	} else if isMediumMeteor(meteorType) {
-		m.Size = 32
-		m.Health = 2
-		m.Points = 75
-		m.RotationSpeed = (rand.Float32() * 240) - 120 // Entre -120 y 120
-		m.Velocity = engine.Vector2D{
-			X: ((rand.Float32() * 180) - 90) * velocityReductionFactor,    // Entre -90 y 90
-			Y: (120 + (rand.Float32() * 120)) * velocityReductionFactor,   // Entre 120 y 240
-		}
-	} else if isSmallMeteor(meteorType) {
-		m.Size = 20
-		m.Health = 1
-		m.Points = 50
-		m.RotationSpeed = (rand.Float32() * 300) - 150 // Entre -150 y 150
-		m.Velocity = engine.Vector2D{
-			X: ((rand.Float32() * 240) - 120) * velocityReductionFactor,   // Entre -120 y 120
-			Y: (120 + (rand.Float32() * 180)) * velocityReductionFactor,   // Entre 120 y 300
-		}
-	} else { // tiny meteor
-		m.Size = 14
-		m.Health = 1
-		m.Points = 25
-		m.RotationSpeed = (rand.Float32() * 360) - 180 // Entre -180 y 180
-		m.Velocity = engine.Vector2D{
-			X: ((rand.Float32() * 300) - 150) * velocityReductionFactor,   // Entre -150 y 150
-			Y: (180 + (rand.Float32() * 180)) * velocityReductionFactor,   // Entre 180 y 360
-		}
-	}
-	
-	// Aplicar velocidad adicional para meteoritos grises (más veloces)
-	if isGreyMeteor(meteorType) {
-		m.Health += 1  // Los grises tienen 1 punto más de vida
-		m.Points += 20 // Dan más puntos
-	}
-	
+
 	return m
 }
 
-// Helper functions para identificar categorías de meteoritos
-func isBigMeteor(meteorType string) bool {
-	for _, t := range MeteorCategories["big"] {
-		if t == meteorType {
-			return true
-		}
+// NewMeteorFromConfig crea un nuevo meteorito utilizando la configuración
+func NewMeteorFromConfig(x, y float32, meteorType string, meteorConfig *config.MeteorTypeConfig) *Meteor {
+	// Si no se proporciona configuración o es inválida, usar método tradicional
+	if meteorConfig == nil {
+		return NewMeteor(x, y, meteorType)
 	}
-	return false
-}
 
-func isMediumMeteor(meteorType string) bool {
-	for _, t := range MeteorCategories["medium"] {
-		if t == meteorType {
-			return true
-		}
+	// Obtener valores aleatorios dentro de los rangos de la configuración
+	speedX := getRandomValueInRange(meteorConfig.SpeedXRange)
+	speedY := getRandomValueInRange(meteorConfig.SpeedYRange)
+	rotSpeed := getRandomValueInRange(meteorConfig.RotationSpeedRange)
+	
+	// Crear meteorito
+	m := &Meteor{
+		BaseGameObject: engine.BaseGameObject{
+			Type: "meteor",
+			Position: engine.Vector2D{X: x, Y: y},
+			Velocity: engine.Vector2D{X: speedX, Y: speedY},
+		},
+		MeteorType:    meteorType,
+		Size:          meteorConfig.HitboxWidth, // Usamos hitboxWidth como tamaño visual aproximado
+		Rotation:      0,
+		RotationSpeed: rotSpeed,
+		Health:        meteorConfig.HP,
+		Points:        meteorConfig.Points,
+		DestroyedBy:   -1,
 	}
-	return false
+
+	return m
 }
 
-func isSmallMeteor(meteorType string) bool {
-	for _, t := range MeteorCategories["small"] {
-		if t == meteorType {
-			return true
-		}
+// getRandomValueInRange devuelve un valor aleatorio dentro del rango proporcionado
+func getRandomValueInRange(valueRange []float32) float32 {
+	// Si el rango no es válido o está vacío, devolver 0
+	if valueRange == nil || len(valueRange) < 2 {
+		return 0
 	}
-	return false
+	
+	min := valueRange[0]
+	max := valueRange[1]
+	
+	// Si min y max son iguales, devolver ese valor
+	if min == max {
+		return min
+	}
+	
+	// Generar un valor aleatorio en el rango [min, max]
+	return min + float32(rand.Float64())*(max-min)
 }
 
-func isGreyMeteor(meteorType string) bool {
-	return len(meteorType) >= 4 && meteorType[:4] == "grey"
-}
-
-// Update actualiza el meteorito
+// Update actualiza el estado del meteorito
 func (m *Meteor) Update() {
+	// Si ya está destruido, no hacer nada
+	if m.DestroyedBy >= 0 {
+		return
+	}
+
 	// Aplicar un delta time más pequeño para movimiento más lento
 	// Usamos 0.016 (16ms) para 60 FPS, lo reducimos más para meteoritos más lentos
 	const deltaTime = 0.008 // La mitad de 16ms
@@ -168,19 +161,24 @@ func (m *Meteor) Update() {
 	}
 }
 
-// TakeDamage reduce la salud del meteorito
+// TakeDamage reduce los puntos de vida del meteorito y devuelve true si fue destruido
 func (m *Meteor) TakeDamage(damage int, playerID int32) bool {
+	// Si ya está destruido, no hacer nada
+	if m.DestroyedBy >= 0 {
+		return true
+	}
+
 	m.Health -= damage
 	if m.Health <= 0 {
 		m.DestroyedBy = playerID
-		return true // Meteorito destruido
+		return true
 	}
-	return false // Meteorito sigue vivo
+	return false
 }
 
 // IsDestroyed verifica si el meteorito ha sido destruido
 func (m *Meteor) IsDestroyed() bool {
-	return m.Health <= 0
+	return m.DestroyedBy >= 0
 }
 
 // GetDestroyedBy devuelve el ID del jugador que destruyó el meteorito
@@ -196,4 +194,56 @@ func (m *Meteor) GetMeteorType() string {
 // GetPoints devuelve los puntos que otorga el meteorito
 func (m *Meteor) GetPoints() int {
 	return m.Points
+}
+
+// GetSyncData devuelve los datos para sincronizar el meteorito con los clientes
+func (m *Meteor) GetSyncData() map[string]interface{} {
+	return map[string]interface{}{
+		"id":           m.ID,
+		"type":         "meteor",
+		"subtype":      m.MeteorType,
+		"x":            m.Position.X,
+		"y":            m.Position.Y,
+		"velocity_x":   m.Velocity.X,
+		"velocity_y":   m.Velocity.Y,
+		"rotation":     m.Rotation,
+		"rot_speed":    m.RotationSpeed,
+		"hp":           m.Health,
+		"size":         m.Size,
+		"destroyed_by": m.DestroyedBy,
+	}
+}
+
+// String devuelve una representación en texto del meteorito
+func (m *Meteor) String() string {
+	return fmt.Sprintf("Meteor[ID:%d, Type:%s, Pos:(%.1f,%.1f), Vel:(%.1f,%.1f), HP:%d]", 
+		m.ID, m.MeteorType, m.Position.X, m.Position.Y, m.Velocity.X, m.Velocity.Y, m.Health)
+}
+
+// GetRandomMeteorType devuelve un tipo de meteorito aleatorio
+// Se mantiene por compatibilidad, pero se recomienda usar los métodos del paquete config
+func GetRandomMeteorType(category string) string {
+	// Tipos por categoría
+	meteorTypes := map[string][]string{
+		"big": {"brown_big_1", "brown_big_2", "grey_big_1", "grey_big_2"},
+		"medium": {"brown_medium_1", "brown_medium_2", "grey_medium_1", "grey_medium_2"},
+		"small": {"brown_small_1", "brown_small_2", "grey_small_1", "grey_small_2"},
+		"tiny": {"brown_tiny_1", "brown_tiny_2", "grey_tiny_1", "grey_tiny_2"},
+		"brown": {"brown_big_1", "brown_big_2", "brown_medium_1", "brown_medium_2", "brown_small_1", "brown_small_2", "brown_tiny_1", "brown_tiny_2"},
+		"grey": {"grey_big_1", "grey_big_2", "grey_medium_1", "grey_medium_2", "grey_small_1", "grey_small_2", "grey_tiny_1", "grey_tiny_2"},
+	}
+
+	// Si se especificó una categoría y existe, elegir de esa categoría
+	if category != "" && len(meteorTypes[category]) > 0 {
+		return meteorTypes[category][rand.Intn(len(meteorTypes[category]))]
+	}
+
+	// Si no se especificó categoría o no existe, elegir de todos los tipos
+	allTypes := []string{
+		"brown_big_1", "brown_big_2", "grey_big_1", "grey_big_2",
+		"brown_medium_1", "brown_medium_2", "grey_medium_1", "grey_medium_2",
+		"brown_small_1", "brown_small_2", "grey_small_1", "grey_small_2",
+		"brown_tiny_1", "brown_tiny_2", "grey_tiny_1", "grey_tiny_2",
+	}
+	return allTypes[rand.Intn(len(allTypes))]
 } 

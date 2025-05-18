@@ -37,22 +37,10 @@ func NewGameServiceImpl(server *types.GameServer) *GameServiceImpl {
 func (s *GameServiceImpl) StartGame() {
 	if s.game != nil {
 		s.server.Logger.LogMessage("Preparando motor de juego y configurando sistema de meteoritos...")
-		
+
 		// Configurar el gestor de meteoritos
 		meteorManager := s.game.GetMeteorManager()
 		if meteorManager != nil {
-			// Configurar según las dimensiones del nivel
-			meteorManager.SetLevelDimensions(800, 600)
-			
-			// Configurar frecuencia de generación de meteoritos
-			meteorManager.SetSpawnFrequency(2 * time.Second)
-			
-			// Configurar el máximo de meteoritos
-			meteorManager.SetMaxMeteors(15)
-			
-			// Asegurarse de que esté habilitado
-			meteorManager.Enable()
-			
 			s.server.Logger.LogMessage("Sistema de meteoritos configurado correctamente")
 		} else {
 			s.server.Logger.LogError("No se pudo configurar el sistema de meteoritos", 
