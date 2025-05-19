@@ -45,7 +45,7 @@
 
 \lstset{style=mystyle}
 
-\title{\textbf{Implementación de un Sistema Multijugador para Space Shooter}}
+\title{\textbf{Implementación de un Sistema Multijugador para Last Three Standing}}
 \author{Proyecto Anna \\ Universidad}
 \date{\today}
 
@@ -58,7 +58,7 @@
 
 \section{Introducción}
 
-Space Shooter es un juego de tipo arcade desarrollado en Python utilizando la biblioteca Pygame, donde el jugador controla una nave espacial y debe esquivar y destruir meteoritos. Este proyecto busca ampliar sus características para permitir la modalidad multijugador.
+Last Three Standing es un juego de tipo arcade desarrollado en Python utilizando la biblioteca Pygame, donde el jugador controla una nave espacial y debe esquivar y destruir meteoritos. Este proyecto busca ampliar sus características para permitir la modalidad multijugador.
 
 El objetivo principal es transformar la experiencia de juego individual en una experiencia multijugador cooperativa, donde múltiples jugadores puedan unirse a una misma partida. Para lograrlo, se implementará una arquitectura cliente-servidor, donde un servidor desarrollado en Go gestionará la lógica del juego y la comunicación entre los clientes mediante gRPC.
 
@@ -70,13 +70,13 @@ La elección de estas tecnologías responde a necesidades específicas del proye
     \item \textbf{gRPC}: Proporciona un marco de comunicación eficiente y tipado entre lenguajes diferentes.
 \end{itemize}
 
-Este informe detalla el proceso de análisis, diseño e implementación del sistema multijugador para Space Shooter.
+Este informe detalla el proceso de análisis, diseño e implementación del sistema multijugador para Last Three Standing.
 
 \section{Análisis del Problema}
 
 \subsection{Estado Actual del Juego}
 
-El juego Space Shooter en su versión original es una aplicación monolítica para un solo jugador que ejecuta toda la lógica del juego en un mismo proceso. Sus componentes principales incluyen:
+El juego Last Three Standing en su versión original es una aplicación monolítica para un solo jugador que ejecuta toda la lógica del juego en un mismo proceso. Sus componentes principales incluyen:
 
 \begin{itemize}
     \item \textbf{Motor del juego}: Gestiona el bucle principal, la detección de colisiones y el renderizado.
@@ -271,7 +271,7 @@ El frontend está implementado en Python utilizando Pygame, adaptado para la com
     \centering
     \begin{lstlisting}[language=text]
     +-------------------------------------------------------+
-    |                    SpaceShooterGame                   |
+    |                    LastThreeStandingGame              |
     |          (Clase principal y motor del juego)          |
     +-------------------------------------------------------+
                   /               |              \
@@ -294,7 +294,7 @@ El frontend está implementado en Python utilizando Pygame, adaptado para la com
 \subsubsection{Componentes Principales}
 
 \begin{itemize}
-    \item \textbf{SpaceShooterGame}: Clase principal que extiende el motor base del juego.
+    \item \textbf{LastThreeStandingGame}: Clase principal que extiende el motor base del juego.
     
     \item \textbf{NetworkClient}: Maneja la comunicación con el servidor mediante gRPC.
     
@@ -366,8 +366,8 @@ El archivo \texttt{game.proto} está estructurado en tres partes principales:
 \begin{lstlisting}[language=proto, caption=Estructura del archivo game.proto]
 syntax = "proto3";
 
-package space_shooter;
-option go_package = "github.com/user/space_shooter/proto";
+package last_tree_standing;
+option go_package = "github.com/user/last_tree_standing/proto";
 
 // Tipos básicos
 message Vector2 {
@@ -587,6 +587,13 @@ class OtherPlayer:
 
 \section{Pruebas – Ejecución}
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/image_game_1.png}
+    \caption{Captura del juego}
+    \label{fig:enter-label}
+\end{figure}
+
 Las pruebas del sistema multijugador se dividieron en varias etapas:
 
 \subsection{Pruebas Unitarias}
@@ -621,7 +628,7 @@ Para simular condiciones de red reales, se realizaron pruebas con diferentes niv
 
 \section{Conclusiones}
 
-La implementación de un sistema multijugador para Space Shooter representa un avance significativo en la evolución del juego, transformándolo de una experiencia individual a una colaborativa. Este proyecto ha demostrado los siguientes puntos clave:
+La implementación de un sistema multijugador para Last Three Standing representa un avance significativo en la evolución del juego, transformándolo de una experiencia individual a una colaborativa. Este proyecto ha demostrado los siguientes puntos clave:
 
 \begin{itemize}
     \item \textbf{Arquitectura efectiva}: La arquitectura cliente-servidor ha demostrado ser efectiva para sincronizar el estado del juego entre múltiples jugadores.
@@ -645,7 +652,7 @@ El proyecto también ha identificado áreas de mejora para futuras iteraciones:
     \item \textbf{Modos de juego adicionales}: Desarrollar modos competitivos y cooperativos.
 \end{itemize}
 
-En conclusión, este proyecto ha logrado transformar exitosamente Space Shooter en un juego multijugador cooperativo, demostrando que es posible adaptar juegos monolíticos existentes a arquitecturas distribuidas con las tecnologías adecuadas. La combinación de Python, Go y gRPC ha proporcionado un equilibrio óptimo entre facilidad de desarrollo, rendimiento y capacidad de comunicación.
+En conclusión, este proyecto ha logrado transformar exitosamente Last Three Standing en un juego multijugador cooperativo, demostrando que es posible adaptar juegos monolíticos existentes a arquitecturas distribuidas con las tecnologías adecuadas. La combinación de Python, Go y gRPC ha proporcionado un equilibrio óptimo entre facilidad de desarrollo, rendimiento y capacidad de comunicación.
 
 \section{Bibliografía}
 

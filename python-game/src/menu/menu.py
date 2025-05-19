@@ -54,7 +54,7 @@ class MainMenu:
         self.selected_option = 0
         
         # Renderizar textos una vez
-        self.title_text = self.title_font.render("Space Shooter Multiplayer", True, WHITE)
+        self.title_text = self.title_font.render("The Last Tree Standing", True, WHITE)
         self.option_texts = [self.option_font.render(option, True, WHITE) for option in self.options]
         self.selected_option_texts = [self.option_font.render(option, True, BLUE) for option in self.options]
     
